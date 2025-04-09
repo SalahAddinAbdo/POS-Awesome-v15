@@ -487,6 +487,10 @@ def update_invoice_from_order(data):
     data = json.loads(data)
     invoice_doc = frappe.get_doc("Sales Invoice", data.get("name"))
     invoice_doc.update(data)
+
+    if data.get("custom_order_type"):
+        invoice_doc.custom_order_type = data.get("custom_order_type")
+
     invoice_doc.save()
     return invoice_doc
 
@@ -499,7 +503,10 @@ def update_invoice(data):
         invoice_doc.update(data)
     else:
         invoice_doc = frappe.get_doc(data)
-
+		
+    if data.get("custom_order_type"):
+        invoice_doc.custom_order_type = data.get("custom_order_type")
+		
     invoice_doc.set_missing_values()
     invoice_doc.flags.ignore_permissions = True
     frappe.flags.ignore_account_permission = True
@@ -556,6 +563,10 @@ def submit_invoice(invoice, data):
     invoice = json.loads(invoice)
     invoice_doc = frappe.get_doc("Sales Invoice", invoice.get("name"))
     invoice_doc.update(invoice)
+	
+    if data.get("custom_order_type"):
+        invoice_doc.custom_order_type = data.get("custom_order_type")
+	
     if invoice.get("posa_delivery_date"):
         invoice_doc.update_stock = 0
     mop_cash_list = [
