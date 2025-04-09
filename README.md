@@ -51,7 +51,7 @@ One-click installation is available if you are hosting on [ASAERP](https://asaer
 
 #### Self Hosting:
 
-1. `bench get-app branch version-15 https://github.com/ASATechnologies/POS-Awesome.git`
+1. `bench get-app branch version-15 https://github.com/SalahAddinAbdo/POS-Awesome-v15.git`
 2. `bench setup requirements`
 3. `bench build --app posawesome`
 4. `bench restart`
