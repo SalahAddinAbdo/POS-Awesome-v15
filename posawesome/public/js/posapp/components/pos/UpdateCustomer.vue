@@ -30,7 +30,7 @@
                   hide-details v-model="email_id"></v-text-field>
               </v-col>
               <v-col cols="6">
-                <v-select density="compact" label="Gender" :items="genders" v-model="gender"></v-select>
+                <v-select density="compact" :label="frappe._('Gender')" :items="genders" v-model="gender"></v-select> <!-- Code Modified by Salah -->
               </v-col>
               <v-col cols="6">
                 <v-text-field density="compact" color="primary" :label="frappe._('Referral Code')" bg-color="white"
