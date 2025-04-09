@@ -33,11 +33,13 @@
             </v-row>
           </v-container>
         </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="error" theme="dark" @click="close_dialog">Close</v-btn>
-          <v-btn color="success" theme="dark" @click="submit_dialog">Load Sale</v-btn>
-        </v-card-actions>
+		<v-card-actions>
+		  <v-spacer></v-spacer>
+		  <!-- Modified by Salah -->
+		  <v-btn color="error" theme="dark" @click="close_dialog">{{ __('Close') }}</v-btn>
+		  <!-- Modified by Salah -->
+		  <v-btn color="success" theme="dark" @click="submit_dialog">{{ __('Load Sale') }}</v-btn>
+		</v-card-actions>
       </v-card>
     </v-dialog>
   </v-row>
@@ -101,7 +103,8 @@ export default {
       }
       else {
         this.eventBus.emit("show_message", {
-          title: `Select an invoice to load`,
+          // Code modified by Salah
+          title: __('Select an invoice to load'),
           color: "error",
         });
       }
