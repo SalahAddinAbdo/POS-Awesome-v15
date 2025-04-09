@@ -7,8 +7,9 @@
             __("Cancel Sale ?")
             }}</span>
         </v-card-title>
+		<!-- Code modified by Salah -->
         <v-card-text>
-          This would cancel and delete the current sale. To save it as Draft, click the "Save and Clear" instead.
+          {{ __("This would cancel and delete the current sale. To save it as Draft, click the Save and Clear instead.") }}
         </v-card-text>
         <!-- <v-card- -->
         <v-card-actions>
@@ -321,39 +322,34 @@
                 density="compact" readonly hide-details color="accent"></v-text-field>
             </v-col>
             <v-col v-if="!pos_profile.posa_use_percentage_discount" cols="6" class="pa-1">
-              <v-text-field :model-value="formatCurrency(discount_amount)" @change="
-                setFormatedCurrency(
-                  discount_amount,
-                  'discount_amount',
-                  null,
-                  false,
-                  $event
-                )
-                " :rules="[isNumber]" :label="frappe._('Additional Discount')" ref="discount" variant="outlined"
-                density="compact" hide-details color="warning" :prefix="currencySymbol(pos_profile.currency)" :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount ||
-                  discount_percentage_offer_name
-                  ? true
-                  : false
-                  "></v-text-field>
+				<v-text-field
+				  v-model.number="discount_amount"
+				  @click="openDiscountPopup(false)"
+				  :label="frappe._('Additional Discount')"
+				  :prefix="currencySymbol(pos_profile.currency)"
+				  :rules="[isNumber]"
+				  variant="outlined"
+				  density="compact"
+				  hide-details
+				  color="warning"
+				  ref="discount"
+				  :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount || discount_percentage_offer_name"
+				></v-text-field>
             </v-col>
             <v-col v-if="pos_profile.posa_use_percentage_discount" cols="6" class="pa-1">
-              <v-text-field :model-value="formatFloat(additional_discount_percentage)" @change="
-                [
-                  setFormatedFloat(
-                    additional_discount_percentage,
-                    'additional_discount_percentage',
-                    null,
-                    false,
-                    $event
-                  ),
-                  update_discount_umount(),
-                ]
-                " :rules="[isNumber]" :label="frappe._('Additional Discount %')" suffix="%" ref="percentage_discount"
-                variant="outlined" density="compact" color="warning" hide-details :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount ||
-                  discount_percentage_offer_name
-                  ? true
-                  : false
-                  "></v-text-field>
+				<v-text-field
+				  v-model.number="additional_discount_percentage"
+				  @click="openDiscountPopup(true)"
+				  :label="frappe._('Additional Discount %')"
+				  suffix="%"
+				  :rules="[isNumber]"
+				  variant="outlined"
+				  density="compact"
+				  color="warning"
+				  hide-details
+				  ref="percentage_discount"
+				  :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount || discount_percentage_offer_name"
+				></v-text-field>
             </v-col>
             <v-col cols="6" class="pa-1 mt-2">
               <v-text-field :model-value="formatCurrency(total_items_discount_amount)"
@@ -402,6 +398,29 @@
           </v-row>
         </v-col>
       </v-row>
+	  
+		<!-- Discount Popup Dialog -->
+		<v-dialog v-model="showDiscountPopup" max-width="300">
+		  <v-card>
+			<v-card-title>{{ __('Enter Discount') }}</v-card-title>
+			<v-card-text>
+			  <v-text-field
+				v-model.number="tempDiscountValue"
+				:label="discountIsPercentage ? __('Discount %') : __('Discount Amount')"
+				type="number"
+				hide-details
+				suffix="%"
+				:prefix="!discountIsPercentage ? currencySymbol(pos_profile.currency) : ''"
+			  ></v-text-field>
+			</v-card-text>
+			<v-card-actions>
+			  <v-spacer></v-spacer>
+			  <v-btn color="primary" @click="applyDiscountPopup">{{ __('Apply') }}</v-btn>
+			  <v-btn color="grey" @click="showDiscountPopup = false">{{ __('Cancel') }}</v-btn>
+			</v-card-actions>
+		  </v-card>
+		</v-dialog>
+	  
     </v-card>
   </div>
 </template>
@@ -458,6 +477,10 @@ export default {
         { title: __("Amount"), key: "amount", align: "center" },
         { title: __("Offer?"), key: "posa_is_offer", align: "center" },
       ],
+	  
+	  	showDiscountPopup: false,
+		tempDiscountValue: 0,
+		discountIsPercentage: false,
     };
   },
 
@@ -481,16 +504,31 @@ export default {
       });
       return this.flt(sum, this.currency_precision);
     },
-    subtotal() {
-      this.close_payments();
-      let sum = 0;
-      this.items.forEach((item) => {
-        sum += flt(item.qty) * flt(item.rate);
-      });
-      sum -= this.flt(this.discount_amount);
-      sum += this.flt(this.delivery_charges_rate);
-      return this.flt(sum, this.currency_precision);
-    },
+	
+	subtotal() {
+	  this.close_payments();
+
+	  let sum = 0;
+
+	  // Sum up item net totals
+	  this.items.forEach((item) => {
+		const itemTotal = flt(item.qty) * flt(item.rate);
+		sum += itemTotal;
+	  });
+
+	  // Apply global discount
+	  if (this.pos_profile.posa_use_percentage_discount) {
+		sum -= (sum * this.additional_discount_percentage) / 100;
+	  } else {
+		sum -= this.flt(this.discount_amount);
+	  }
+
+	  // Add delivery charges
+	  sum += this.flt(this.delivery_charges_rate);
+
+	  return this.flt(sum, this.currency_precision);
+	},
+	
     total_items_discount_amount() {
       let sum = 0;
       this.items.forEach((item) => {
@@ -569,9 +607,7 @@ export default {
         if (item.has_serial_no && item.to_set_serial_no) {
           if (cur_item.serial_no_selected.includes(item.to_set_serial_no)) {
             this.eventBus.emit("show_message", {
-              title: __(`This Serial Number {0} has already been added!`, [
-                item.to_set_serial_no,
-              ]),
+            title: `${__('This Serial Number')} ${item.to_set_serial_no} ${__('has already been added!')}`,
               color: "warning",
             });
             item.to_set_serial_no = null;
@@ -750,14 +786,14 @@ export default {
         }
         else {
           this.eventBus.emit("show_message", {
-            title: `Nothing to save`,
+            title: __('Nothing to save'),
             color: "error",
           });
         }
       }
       if (!old_invoice) {
         this.eventBus.emit("show_message", {
-          title: `Error saving the current invoice`,
+          title: __('Error saving the current invoice'),
           color: "error",
         });
       }
@@ -1057,7 +1093,7 @@ export default {
       }
       if (!this.items.length) {
         this.eventBus.emit("show_message", {
-          title: __(`Select items to sell`),
+          title: __('Select items to sell'),
           color: "error",
         });
         return;
@@ -1119,10 +1155,7 @@ export default {
               discount_percentage > this.pos_profile.posa_max_discount_allowed
             ) {
               vm.eventBus.emit("show_message", {
-                title: __(
-                  `Discount percentage for item '{0}' cannot be greater than {1}%`,
-                  [item.item_name, this.pos_profile.posa_max_discount_allowed]
-                ),
+              title: `${__('Discount percentage for item')} '${item.item_name}' ${__('cannot be greater than')} ${this.pos_profile.posa_max_discount_allowed}%`,
                 color: "error",
               });
               value = false;
@@ -1136,10 +1169,7 @@ export default {
               (item.is_stock_item && item.stock_qty > item.actual_qty))
           ) {
             vm.eventBus.emit("show_message", {
-              title: __(
-                `The existing quantity '{0}' for item '{1}' is not enough`,
-                [item.actual_qty, item.item_name]
-              ),
+            title: `${__('The existing quantity')} '${item.actual_qty}' ${__('for item')} '${item.item_name}' ${__('is not enough')}`,
               color: "error",
             });
             value = false;
@@ -1147,9 +1177,7 @@ export default {
         }
         if (item.qty == 0) {
           vm.eventBus.emit("show_message", {
-            title: __(`Quantity for item '{0}' cannot be Zero (0)`, [
-              item.item_name,
-            ]),
+          title: `${__('Quantity for item')} '${item.item_name}' ${__('cannot be Zero (0)')}`,
             color: "error",
           });
           value = false;
@@ -1159,10 +1187,7 @@ export default {
           item.discount_percentage > item.max_discount
         ) {
           vm.eventBus.emit("show_message", {
-            title: __(`Maximum discount for Item {0} is {1}%`, [
-              item.item_name,
-              item.max_discount,
-            ]),
+          title: `${__('Maximum discount for item')} '${item.item_name}' ${__('is')} ${item.max_discount}%`,
             color: "error",
           });
           value = false;
@@ -1174,9 +1199,7 @@ export default {
               item.stock_qty != item.serial_no_selected.length)
           ) {
             vm.eventBus.emit("show_message", {
-              title: __(`Selected serial numbers of item {0} is incorrect`, [
-                item.item_name,
-              ]),
+            title: `${__('Selected serial numbers of item')} '${item.item_name}' ${__('is incorrect')}`,
               color: "error",
             });
             value = false;
@@ -1185,10 +1208,7 @@ export default {
         if (item.has_batch_no) {
           if (item.stock_qty > item.actual_batch_qty) {
             vm.eventBus.emit("show_message", {
-              title: __(
-                `The existing batch quantity of item {0} is not enough`,
-                [item.item_name]
-              ),
+            title: `${__('The existing batch quantity of item')} '${item.item_name}' ${__('is not enough')}`,
               color: "error",
             });
             value = false;
@@ -1198,18 +1218,28 @@ export default {
           const clac_percentage = (this.discount_amount / this.Total) * 100;
           if (clac_percentage > this.pos_profile.posa_max_discount_allowed) {
             vm.eventBus.emit("show_message", {
-              title: __(`The discount should not be higher than {0}%`, [
-                this.pos_profile.posa_max_discount_allowed,
-              ]),
+            title: `${__('The discount should not be higher than')} ${this.pos_profile.posa_max_discount_allowed}%`,
               color: "error",
             });
             value = false;
           }
         }
+		
+		if (this.pos_profile.posa_use_percentage_discount && this.pos_profile.posa_allow_user_to_edit_additional_discount) {
+		  const percentage = flt(this.additional_discount_percentage);
+		  if (percentage > this.pos_profile.posa_max_discount_allowed) {
+			vm.eventBus.emit("show_message", {
+			  title: `${__('Additional Discount % cannot exceed')} ${this.pos_profile.posa_max_discount_allowed}%`,
+			  color: "error",
+			});
+			value = false;
+		  }
+		}
+		
         if (this.invoice_doc.is_return) {
           if (this.subtotal >= 0) {
             vm.eventBus.emit("show_message", {
-              title: __(`Return Invoice Total Not Correct`),
+              title: __('Return Invoice Total Not Correct'),
               color: "error",
             });
             value = false;
@@ -1217,9 +1247,7 @@ export default {
           }
           if (Math.abs(this.subtotal) > Math.abs(this.return_doc.total)) {
             vm.eventBus.emit("show_message", {
-              title: __(`Return Invoice Total should not be higher than {0}`, [
-                this.return_doc.total,
-              ]),
+            title: `${__('Return Invoice Total should not be higher than')} ${this.return_doc.total}`,
               color: "error",
             });
             value = false;
@@ -1232,10 +1260,7 @@ export default {
 
             if (!return_item) {
               vm.eventBus.emit("show_message", {
-                title: __(
-                  `The item {0} cannot be returned because it is not in the invoice {1}`,
-                  [item.item_name, this.return_doc.name]
-                ),
+              title: `${__('The item')} '${item.item_name}' ${__('cannot be returned because it is not in the invoice')} '${this.return_doc.name}'`,
                 color: "error",
               });
               value = false;
@@ -1245,10 +1270,7 @@ export default {
               Math.abs(item.qty) == 0
             ) {
               vm.eventBus.emit("show_message", {
-                title: __(`The QTY of the item {0} cannot be greater than {1}`, [
-                  item.item_name,
-                  return_item.qty,
-                ]),
+              title: `${__('The QTY of the item')} '${item.item_name}' ${__('cannot be greater than')} ${return_item.qty}`,
                 color: "error",
               });
               value = false;
@@ -2426,7 +2448,7 @@ export default {
     print_draft_invoice() {
       if (!this.pos_profile.posa_allow_print_draft_invoices) {
         this.eventBus.emit("show_message", {
-          title: __(`You are not allowed to print draft invoices`),
+          title: __('You are not allowed to print draft invoices'),
           color: "error",
         });
         return;
@@ -2490,6 +2512,22 @@ export default {
         this.delivery_charges_rate = 0;
       }
     },
+	
+	openDiscountPopup(isPercentage) {
+	this.discountIsPercentage = isPercentage;
+	this.tempDiscountValue = isPercentage
+	  ? this.additional_discount_percentage
+	  : this.discount_amount;
+	this.showDiscountPopup = true;
+	},
+	applyDiscountPopup() {
+	if (this.discountIsPercentage) {
+	  this.additional_discount_percentage = this.tempDiscountValue;
+	} else {
+	  this.discount_amount = this.tempDiscountValue;
+	}
+	this.showDiscountPopup = false;
+	},
   },
 
   mounted() {
@@ -2576,6 +2614,14 @@ export default {
     document.removeEventListener("keydown", this.shortSelectDiscount);
   },
   watch: {
+    discount_amount(val) {
+      if (!val || val == 0) {
+        this.additional_discount_percentage = 0;
+      } else if (this.pos_profile.posa_use_percentage_discount) {
+        this.additional_discount_percentage = (val / this.Total) * 100;
+      }
+    },
+
     customer() {
       this.close_payments();
       this.eventBus.emit("set_customer", this.customer);
@@ -2605,16 +2651,6 @@ export default {
     },
     invoiceType() {
       this.eventBus.emit("update_invoice_type", this.invoiceType);
-    },
-    discount_amount() {
-      if (!this.discount_amount || this.discount_amount == 0) {
-        this.additional_discount_percentage = 0;
-      } else if (this.pos_profile.posa_use_percentage_discount) {
-        this.additional_discount_percentage =
-          (this.discount_amount / this.Total) * 100;
-      } else {
-        this.additional_discount_percentage = 0;
-      }
     },
   },
 };
