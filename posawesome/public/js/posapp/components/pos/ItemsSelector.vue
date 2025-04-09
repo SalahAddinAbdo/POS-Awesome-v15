@@ -1,5 +1,52 @@
 <template>
   <div>
+     <v-card class="cards mb-0 mt-3 pa-2 bg-grey-lighten-5">
+      <v-row no-gutters align="center" justify="center">
+        <v-col cols="3" class="mt-1">
+          <v-btn-toggle v-model="items_view" color="primary" group density="compact" rounded>
+            <v-btn size="small" value="list">{{ __("List") }}</v-btn>
+            <v-btn size="small" value="card">{{ __("Card") }}</v-btn>
+          </v-btn-toggle>
+        </v-col>
+        <v-col cols="4" class="mt-2">
+          <v-btn size="small" block color="primary" variant="text" @click="show_coupons">{{ couponsCount }} {{
+            __("Coupons")
+            }}</v-btn>
+        </v-col>
+        <v-col cols="5" class="mt-2">
+          <v-btn size="small" block color="primary" variant="text" @click="show_offers">{{ offersCount }} {{
+            __("Offers") }}
+            : {{ appliedOffersCount }}
+            {{ __("Applied") }}</v-btn>
+        </v-col>
+		<v-col cols="12">
+          <v-select :items="items_group" :label="frappe._('Items Group')" density="compact" variant="outlined"
+            hide-details v-model="item_group" v-on:update:model-value="search_onchange"></v-select>
+        </v-col> <!-- Reorderd by Salah -->
+		<v-col cols="12" class="pt-0 mt-0">
+			<v-row class="overflow-y-auto overflow-y-auto-fixmagin" style="max-height: 20vh; margin: 0;">
+			  <v-col
+				v-for="itemGroup in items_group"
+				:key="itemGroup"
+				xl="2"
+				lg="3"
+				md="6"
+				sm="6"
+				cols="6"
+				class="d-flex justify-center">
+				<v-card
+				  class="mx-2 my-2"
+				  outlined
+				  tile
+				  @click="selectItemGroup(itemGroup)"
+				  :color="itemGroup === item_group ? 'primary lighten-5' : ''">
+				  <v-card-title>{{ itemGroup }}</v-card-title>
+				</v-card>
+			  </v-col>
+			</v-row>
+		  </v-col> <!-- New code by Salah -->
+      </v-row>
+    </v-card> <!-- Reorderd by Salah -->
     <v-card class="selection mx-auto bg-grey-lighten-5 mt-3" style="max-height: 75vh; height: 75vh">
       <v-progress-linear :active="loading" :indeterminate="loading" absolute :location="top"
         color="info"></v-progress-linear>
@@ -16,8 +63,8 @@
             @keydown.esc="esc_event"></v-text-field>
         </v-col>
         <v-col cols="2" class="pb-0 mb-2" v-if="pos_profile.posa_new_line">
-          <v-checkbox v-model="new_line" color="accent" value="true" label="NLine" density="default"
-            hide-details></v-checkbox>
+          <v-checkbox v-model="new_line" color="accent" value="true" :label="frappe._('NLine')" density="default"
+            hide-details></v-checkbox> <!-- Code Modified by Salah -->
         </v-col>
         <v-col cols="12" class="pt-0 mt-0">
           <div fluid class="items" v-if="items_view == 'card'">
@@ -60,31 +107,6 @@
               </v-data-table>
             </div>
           </div>
-        </v-col>
-      </v-row>
-    </v-card>
-    <v-card class="cards mb-0 mt-3 pa-2 bg-grey-lighten-5">
-      <v-row no-gutters align="center" justify="center">
-        <v-col cols="12">
-          <v-select :items="items_group" :label="frappe._('Items Group')" density="compact" variant="outlined"
-            hide-details v-model="item_group" v-on:update:model-value="search_onchange"></v-select>
-        </v-col>
-        <v-col cols="3" class="mt-1">
-          <v-btn-toggle v-model="items_view" color="primary" group density="compact" rounded>
-            <v-btn size="small" value="list">{{ __("List") }}</v-btn>
-            <v-btn size="small" value="card">{{ __("Card") }}</v-btn>
-          </v-btn-toggle>
-        </v-col>
-        <v-col cols="4" class="mt-2">
-          <v-btn size="small" block color="primary" variant="text" @click="show_coupons">{{ couponsCount }} {{
-            __("Coupons")
-            }}</v-btn>
-        </v-col>
-        <v-col cols="5" class="mt-2">
-          <v-btn size="small" block color="primary" variant="text" @click="show_offers">{{ offersCount }} {{
-            __("Offers") }}
-            : {{ appliedOffersCount }}
-            {{ __("Applied") }}</v-btn>
         </v-col>
       </v-row>
     </v-card>
@@ -207,22 +229,24 @@ export default {
         console.log("No POS Profile");
         return;
       }
+      // Case 1: use groups from pos_profile
       if (this.pos_profile.item_groups.length > 0) {
-        this.pos_profile.item_groups.forEach((element) => {
-          if (element.item_group !== "All Item Groups") {
-            this.items_group.push(element.item_group);
-          }
-        });
+        const groups = this.pos_profile.item_groups
+          .filter(g => g.item_group !== "All Item Groups")
+          .map(g => g.item_group);
+    
+        this.items_group = [...new Set([...this.items_group, ...groups])];
+    
       } else {
+        // Case 2: fetch from backend
         const vm = this;
         frappe.call({
           method: "posawesome.posawesome.api.posapp.get_items_groups",
           args: {},
           callback: function (r) {
             if (r.message) {
-              r.message.forEach((element) => {
-                vm.items_group.push(element.name);
-              });
+              const groups = r.message.map(g => g.name);
+              vm.items_group = [...new Set([...vm.items_group, ...groups])];
             }
           },
         });
@@ -416,7 +440,8 @@ export default {
     trigger_onscan(sCode) {
       if (this.filtered_items.length == 0) {
         this.eventBus.emit("show_message", {
-          title: `No Item has this barcode "${sCode}"`,
+        // Code modified by Salah
+          title: `${__('No Item has this barcode')} "${sCode}"`,
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -447,6 +472,11 @@ export default {
       permute(words);
 
       return combinations;
+    },
+	selectItemGroup(itemGroup) {
+      this.item_group = itemGroup;
+      // Trigger search or other actions based on the selected item group
+      this.search_onchange();  // New code added by Salah
     },
   },
 
