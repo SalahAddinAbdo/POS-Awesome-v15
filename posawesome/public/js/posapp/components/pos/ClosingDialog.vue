@@ -13,16 +13,41 @@
               <v-col cols="12" class="pa-1">
                 <v-data-table :headers="headers" :items="dialog_data.payment_reconciliation" item-key="mode_of_payment"
                   class="elevation-1" :items-per-page="itemsPerPage" hide-default-footer>
-                  <template v-slot:item.closing_amount="props">
-                    <v-confirm-edit v-model:return-value="props.item.closing_amount">
-                      {{ currencySymbol(pos_profile.currency) }}
-                      {{ formatCurrency(props.item.closing_amount) }}
-                      <template v-slot:input>
-                        <v-text-field v-model="props.item.closing_amount" :rules="[max25chars]"
-                          :label="frappe._('Edit')" single-line counter type="number"></v-text-field>
-                      </template>
-                    </v-confirm-edit>
-                  </template>
+				
+				<!-- Start code modified by Salah -->				
+				<template v-slot:item.closing_amount="{ item, index }">
+					<v-text-field
+					  v-model="item.closing_amount"
+					  type="text"
+					  :label="frappe._('Closing Amount')"
+					  :prefix="currencySymbol(pos_profile.currency)"
+					  hide-details
+					  density="compact"
+					  @focus="activePopupIndex = index; activeKeypadIdx = index; selectedPayment = item">
+					</v-text-field>
+
+					<v-menu
+					  v-if="activePopupIndex === index"
+					  v-model="dummyMenuModel"
+					  activator="parent"
+					  :close-on-content-click="false"
+					  @click:outside="activePopupIndex = null"
+					  offset-y
+					>
+					<v-card class="pa-2 popup-numbers" style="min-width: 300px; max-width: 50%;" @click.stop>
+					  <v-row dense>
+						<v-col cols="4" v-for="n in 9" :key="n">
+						  <v-btn block @click="appendNumber(n)">{{ n }}</v-btn>
+						</v-col>
+						<v-col cols="4"><v-btn block @click="clearAmount()">C</v-btn></v-col>
+						<v-col cols="4"><v-btn block @click="appendNumber(0)">0</v-btn></v-col>
+						<v-col cols="4"><v-btn block color="success" @click="activePopupIndex = null">{{ __("OK") }}</v-btn></v-col>
+					  </v-row>
+					</v-card>
+				  </v-menu>
+				</template>
+				<!-- End code modified by Salah -->
+		
                   <template v-slot:item.difference="{ item }">
                     {{ currencySymbol(pos_profile.currency) }}
                     {{
@@ -87,6 +112,10 @@ export default {
     ],
     max25chars: (v) => v.length <= 20 || 'Input too long!', // TODO : should validate as number
     pagination: {},
+	activeKeypadIdx: null,       // New code added aby Salah
+	activePopupIndex: null,      // New code added aby Salah
+	selectedPayment: {},         // New code added aby Salah
+	dummyMenuModel: true,  // New code added aby Salah
   }),
   watch: {},
 
@@ -98,6 +127,19 @@ export default {
       this.eventBus.emit('submit_closing_pos', this.dialog_data);
       this.closingDialog = false;
     },
+	// Satrt New code by Salah
+	appendNumber(n) {
+	  const target = this.dialog_data.payment_reconciliation[this.activeKeypadIdx];
+	  if (target) {
+		const current = target.closing_amount?.toString() || '';
+		target.closing_amount = parseFloat(current + n);
+	  }
+	},
+	clearAmount() {
+	  const target = this.dialog_data.payment_reconciliation[this.activeKeypadIdx];
+	  if (target) target.closing_amount = 0;
+	},
+	// End New code by Salah
   },
 
   created: function () {
