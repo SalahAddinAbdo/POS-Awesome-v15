@@ -24,14 +24,39 @@
               <v-col cols="12">
                 <v-data-table :headers="payments_methods_headers" :items="payments_methods" item-key="mode_of_payment"
                   class="elevation-1" :items-per-page="itemsPerPage" hide-default-footer>
-                  <template v-slot:item.amount="props">
-                    <v-confirm-edit v-model:return-value="props.item.amount">
-                      {{ currencySymbol(props.item.currency) }}
-                      {{ formatCurrency(props.item.amount) }}
-                      <v-text-field v-model="props.item.amount" :rules="[max25chars]" :label="frappe._('Edit')"
-                        single-line counter type="number"></v-text-field>
-                    </v-confirm-edit>
-                  </template>
+					<!-- Start code modified by Salah -->	
+					<template v-slot:item.amount="{ item, index }">
+					  <v-text-field
+						v-model="item.amount"
+						type="text"
+						:label="frappe._('Opening Amount')"
+						:prefix="currencySymbol(item.currency)"
+						hide-details
+						density="compact"
+						@focus="activePopupIndex = index; activeKeypadIdx = index; selectedPayment = item; editingField = 'amount'"
+					  ></v-text-field>
+
+					  <v-menu
+						v-if="activePopupIndex === index"
+						v-model="dummyMenuModel"
+						activator="parent"
+						:close-on-content-click="false"
+						@click:outside="activePopupIndex = null"
+						offset-y
+					  >
+						<v-card class="pa-2 popup-numbers" style="min-width: 300px; max-width: 50%;" @click.stop>
+						  <v-row dense>
+							<v-col cols="4" v-for="n in 9" :key="n">
+							  <v-btn block @click="appendNumber(n)">{{ n }}</v-btn>
+							</v-col>
+							<v-col cols="4"><v-btn block @click="clearAmount()">C</v-btn></v-col>
+							<v-col cols="4"><v-btn block @click="appendNumber(0)">0</v-btn></v-col>
+							<v-col cols="4"><v-btn block color="success" @click="activePopupIndex = null">{{__("OK")}}</v-btn></v-col>
+						  </v-row>
+						</v-card>
+					  </v-menu>
+					</template>
+					<!-- End code modified by Salah -->
                 </v-data-table>
               </v-col>
             </v-row>
@@ -39,8 +64,15 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="error" theme="dark" @click="go_desk">Cancel</v-btn>
-          <v-btn color="success" :disabled="is_loading" theme="dark" @click="submit_dialog">Submit</v-btn>
+          <!-- Code modified by Salah -->
+          <v-btn color="error" theme="dark" @click="go_desk">
+            {{ __('Cancel') }}
+          </v-btn>
+          
+          <!-- Code modified by Salah -->
+          <v-btn color="success" :disabled="is_loading" theme="dark" @click="submit_dialog">
+            {{ __('Submit') }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -85,6 +117,11 @@ export default {
       snack: false, // TODO : need to remove
       snackColor: '', // TODO : need to remove
       snackText: '', // TODO : need to remove
+		activePopupIndex: null, // New code added aby Salah
+		activeKeypadIdx: null, // New code added aby Salah
+		selectedPayment: {}, // New code added aby Salah
+		dummyMenuModel: true, // New code added aby Salah
+		editingField: '', // New code added aby Salah
     };
   },
   watch: {
@@ -160,6 +197,23 @@ export default {
       frappe.set_route('/');
       location.reload();
     },
+	// Satrt New code by Salah										
+	appendNumber(n) {
+	  const target = this.payments_methods[this.activeKeypadIdx];
+	  if (target) {
+		const field = this.editingField || 'amount';
+		const current = target[field]?.toString() || '';
+		target[field] = parseFloat(current + n);
+	  }
+	},
+	clearAmount() {
+	  const target = this.payments_methods[this.activeKeypadIdx];
+	  if (target) {
+		const field = this.editingField || 'amount';
+		target[field] = 0;
+	  }
+	},
+	// End New code by Salah
   },
   created: function () {
     this.$nextTick(function () {
