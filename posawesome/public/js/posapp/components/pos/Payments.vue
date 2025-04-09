@@ -34,13 +34,41 @@
         <div v-if="is_cashback">
           <v-row class="pyments px-1 py-0" v-for="payment in invoice_doc.payments" :key="payment.name">
             <v-col cols="6" v-if="!is_mpesa_c2b_payment(payment)">
-              <v-text-field density="compact" variant="outlined" color="primary"
-                :label="frappe._(payment.mode_of_payment)" bg-color="white" hide-details
-                :model-value="formatCurrency(payment.amount)" @change="
-                  setFormatedCurrency(payment, 'amount', null, true, $event)
-                  " :rules="[isNumber]" :prefix="currencySymbol(invoice_doc.currency)"
-                @focus="set_rest_amount(payment.idx)" :readonly="invoice_doc.is_return ? true : false"></v-text-field>
+			<!-- Start New Code by Salah -->							
+			<v-text-field
+			  v-model="payment.amount"
+			  type="text"
+			  density="compact"
+			  variant="outlined"
+			  color="primary"
+			  :label="frappe._(payment.mode_of_payment)"
+			  bg-color="white"
+			  hide-details
+			  :rules="[isNumber]"
+			  :prefix="currencySymbol(invoice_doc.currency)"
+			  @focus="popupVisible = true; activeKeypadIdx = payment.idx; selectedPayment = payment"
+			  :readonly="invoice_doc.is_return">
+			</v-text-field>						
             </v-col>
+			<v-menu
+			  v-if="activeKeypadIdx === payment.idx" v-model="popupVisible"
+			  :close-on-content-click="false"
+				@click:outside="popupVisible = false"
+			  activator="parent"
+			  offset-y
+			>
+			<v-card class="pa-2 popup-numbers" style="min-width: 300px; max-width: 50%;" @click.stop>
+				<v-row dense>
+				  <v-col cols="4" v-for="n in 9" :key="n">
+					<v-btn block @click="appendNumber(n)">{{ n }}</v-btn>
+				  </v-col>
+					<v-col cols="4"><v-btn block @click="clearAmount()">C</v-btn></v-col>
+				  <v-col cols="4"><v-btn block @click="appendNumber(0)">0</v-btn></v-col>
+				  <v-col cols="4"><v-btn block color="success" @click="popupVisible = false">{{__("OK")}}</v-btn></v-col>
+				</v-row>
+			  </v-card>
+			</v-menu>
+			<!-- End New Code by Salah -->									
             <v-col v-if="!is_mpesa_c2b_payment(payment)" :cols="6
               ? (payment.type != 'Phone' ||
                 payment.amount == 0 ||
@@ -135,6 +163,26 @@
               bg-color="white" hide-details :model-value="formatCurrency(invoice_doc.grand_total)" disabled
               :prefix="currencySymbol(invoice_doc.currency)"></v-text-field>
           </v-col>
+		  
+		  <v-col cols="6">
+			  <v-select
+				density="compact"
+				variant="outlined"
+				color="primary"
+				bg-color="white"
+				:items="[
+				  { label: frappe._('Dine-in'), value: 'Dine-in' },
+				  { label: frappe._('Takeaway'), value: 'Takeaway' }
+				]"
+				v-model="custom_order_type"
+				:label="frappe._('Order Type')"
+				item-title="label"
+				item-value="value"
+				hide-details
+				prepend-inner-icon="mdi-storefront"
+			  />
+			</v-col>
+		  
           <v-col v-if="invoice_doc.rounded_total" cols="6">
             <v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Rounded Total')"
               bg-color="white" hide-details :model-value="formatCurrency(invoice_doc.rounded_total)" disabled
@@ -348,6 +396,7 @@ export default {
     loading: false,
     pos_profile: "",
     invoice_doc: "",
+	custom_order_type: "Dine-in", // New Code added by Salah
     loyalty_amount: 0,
     credit_sales_due_date: new Date(frappe.datetime.now_date()),
     is_credit_sale: 0,
@@ -369,6 +418,10 @@ export default {
     pos_settings: "",
     customer_info: "",
     mpesa_modes: [],
+	
+	activeKeypadIdx: null, // New Code added by Salah
+	popupVisible: false, // New Code added by Salah
+    selectedPayment: {}, // New Code added by Salah
   }),
 
   methods: {
@@ -379,7 +432,7 @@ export default {
     submit(event, payment_received = false, print = false) {
       if (!this.invoice_doc.is_return && this.total_payments < 0) {
         this.eventBus.emit("show_message", {
-          title: `Payments not correct`,
+          title: __('Payments not correct'),
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -415,7 +468,7 @@ export default {
         (this.invoice_doc.rounded_total || this.invoice_doc.grand_total)
       ) {
         this.eventBus.emit("show_message", {
-          title: `The amount paid is not complete`,
+          title: __('The amount paid is not complete'),
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -428,7 +481,7 @@ export default {
         this.total_payments == 0
       ) {
         this.eventBus.emit("show_message", {
-          title: `Please enter the amount paid`,
+          title: __('Please enter the amount paid'),
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -439,7 +492,7 @@ export default {
 
       if (this.paid_change > -this.diff_payment) {
         this.eventBus.emit("show_message", {
-          title: `Paid change can not be greater than total change!`,
+          title: __('Paid change can not be greater than total change!'),
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -452,7 +505,7 @@ export default {
 
       if (this.is_cashback && total_change != -this.diff_payment) {
         this.eventBus.emit("show_message", {
-          title: `Error in change calculations!`,
+          title: __('Error in change calculations!'),
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -467,7 +520,7 @@ export default {
 
       if (credit_calc_check.length > 0) {
         this.eventBus.emit("show_message", {
-          title: `redeamed credit can not greater than its total.`,
+          title: __('redeamed credit can not greater than its total.'),
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -480,7 +533,7 @@ export default {
         (this.invoice_doc.rounded_total || this.invoice_doc.grand_total)
       ) {
         this.eventBus.emit("show_message", {
-          title: `can not redeam customer credit more than invoice total`,
+          title: __('can not redeam customer credit more than invoice total'),
           color: "error",
         });
         frappe.utils.play_sound("error");
@@ -504,6 +557,9 @@ export default {
           row.credit_to_redeem = flt(row.credit_to_redeem);
         });
       }
+	  
+	  this.invoice_doc.custom_order_type = this.custom_order_type;
+	  
       let data = {};
       data["total_change"] = !this.invoice_doc.is_return
         ? -this.diff_payment
@@ -525,7 +581,7 @@ export default {
         callback: function (r) {
           if (!r?.message) {
             vm.eventBus.emit("show_message", {
-              title: `Error submitting invoice`,
+              title: __('Error submitting invoice'),
               color: "error",
             });
             return;
@@ -540,10 +596,10 @@ export default {
 
           vm.eventBus.emit("set_last_invoice", vm.invoice_doc.name);
           vm.eventBus.emit("show_message", {
-            title: `Invoice ${r.message.name} is Submited`,
+            title: `${__('Invoice')} ${r.message.name} ${__('is Submitted')}`,
             color: "success",
           });
-          //s
+          // Code modified by Salah
           frappe.utils.play_sound("submit");
           vm.addresses = [];
           vm.eventBus.emit("clear_invoice");
@@ -753,7 +809,7 @@ export default {
       const vm = this;
       if (!this.invoice_doc.contact_mobile) {
         this.eventBus.emit("show_message", {
-          title: __(`Pleas Set Customer Mobile Number`),
+          title: __('Pleas Set Customer Mobile Number'),
           color: "error",
         });
         this.eventBus.emit("open_edit_customer");
@@ -761,7 +817,7 @@ export default {
         return;
       }
       this.eventBus.emit("freeze", {
-        title: __(`Waiting for payment... `),
+        title: __('Waiting for payment...'),
       });
       this.invoice_doc.payments.forEach((payment) => {
         payment.amount = flt(payment.amount);
@@ -798,7 +854,7 @@ export default {
             .fail(() => {
               this.eventBus.emit("unfreeze");
               this.eventBus.emit("show_message", {
-                title: __(`Payment request failed`),
+                title: __('Payment request failed'),
                 color: "error",
               });
             })
@@ -815,20 +871,18 @@ export default {
                       this.eventBus.emit("unfreeze");
                       this.eventBus.emit("show_message", {
                         title: __(
-                          `Payment Request took too long to respond. Please try requesting for payment again`
+                          'Payment Request took too long to respond. Please try requesting for payment again'
                         ),
                         color: "error",
                       });
                     } else {
                       this.eventBus.emit("unfreeze");
                       this.eventBus.emit("show_message", {
-                        title: __("Payment of {0} received successfully.", [
-                          vm.formatCurrency(
-                            message.grand_total,
-                            vm.invoice_doc.currency,
-                            0
-                          ),
-                        ]),
+                      title: `${__('Payment of')} ${vm.formatCurrency(
+                        message.grand_total,
+                        vm.invoice_doc.currency,
+                        0
+                      )} ${__('received successfully.')}`,
                         color: "success",
                       });
                       frappe.db
@@ -896,6 +950,17 @@ export default {
       this.clear_all_amounts();
       this.customer_credit_dict.push(advance);
     },
+	// Satrt New code by Salah
+	appendNumber(n) {
+		const current = this.invoice_doc.payments.find(p => p.idx === this.activeKeypadIdx)?.amount?.toString() || "";
+		const target = this.invoice_doc.payments.find(p => p.idx === this.activeKeypadIdx);
+		if (target) target.amount = parseFloat(current + n);
+	},
+	clearAmount() {
+	  const target = this.invoice_doc.payments.find(p => p.idx === this.activeKeypadIdx);
+	  if (target) target.amount = 0;
+	},
+	// End New code by Salah
   },
 
   computed: {
@@ -1075,7 +1140,7 @@ export default {
         this.invoice_doc.redeem_loyalty_points = 0;
         this.invoice_doc.loyalty_points = 0;
         this.eventBus.emit("show_message", {
-          title: `Loyalty Amount can not be more then ${this.available_pioints_amount}`,
+          title: `${__('Loyalty Amount can not be more than')} ${this.available_pioints_amount}`,
           color: "error",
         });
       } else {
@@ -1109,7 +1174,7 @@ export default {
     redeemed_customer_credit(value) {
       if (value > this.available_customer_credit) {
         this.eventBus.emit("show_message", {
-          title: `You can redeem customer credit upto ${this.available_customer_credit}`,
+          title: `${__('You can redeem customer credit upto')} ${this.available_customer_credit}`,
           color: "error",
         });
       }
@@ -1128,4 +1193,5 @@ export default {
     },
   },
 };
+
 </script>
