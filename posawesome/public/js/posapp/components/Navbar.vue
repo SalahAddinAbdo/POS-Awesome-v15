@@ -5,8 +5,7 @@
       <v-img src="/assets/posawesome/js/posapp/components/pos/pos.png" alt="POS Awesome" max-width="32" class="mr-2"
         color="primary"></v-img>
       <v-toolbar-title @click="go_desk" style="cursor: pointer" class="text-uppercase text-primary">
-        <span class="font-weight-light">POS</span>
-        <span>Awesome</span>
+        <span class="font-weight-light">{{__('ERP System')}}</span> <!-- Code Modified by Salah -->
       </v-toolbar-title>
 
       <v-spacer></v-spacer>
@@ -16,7 +15,7 @@
       <div class="text-center">
         <v-menu target="[y]">
           <template v-slot:activator="{ props }">
-            <v-btn color="primary" theme="dark" variant="text" v-bind="props">Menu</v-btn>
+            <v-btn color="primary" theme="dark" variant="text" v-bind="props">{{__('Menu')}}</v-btn> <!-- Code Modified by Salah -->
           </template>
           <v-card class="mx-auto" max-width="300" tile>
             <v-list density="compact" v-model="menu_item" color="primary">
@@ -58,7 +57,7 @@
                   <v-icon icon="mdi-information-outline"></v-icon>
                 </template>
 
-                <v-list-item-title>{{ __('About') }}</v-list-item-title>
+                <v-list-item-title>{{ __('Desktop') }}</v-list-item-title> <!-- Code Modified by Salah -->
 
               </v-list-item>
 
@@ -149,9 +148,9 @@ export default {
     },
     go_about() {
       const win = window.open(
-        'https://github.com/yrestom/POS-Awesome',
+        '/app',
         '_blank'
-      );
+      ); // Code Modified by Salah
       win.focus();
     },
     close_shift_dialog() {
