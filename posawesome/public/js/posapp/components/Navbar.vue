@@ -93,7 +93,7 @@
         </v-list>
       </v-list>
     </v-navigation-drawer>
-    <v-snackbar v-model="snack" :timeout="5000" :color="snackColor" location="top right">
+    <v-snackbar v-model="snack" :timeout="5000" :color="snackColor" location="top">
       {{ snackText }}
     </v-snackbar>
     <v-dialog v-model="freeze" persistent max-width="290">
