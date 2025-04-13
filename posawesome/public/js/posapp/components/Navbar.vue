@@ -63,7 +63,7 @@
         </v-menu>
       </div>
     </v-app-bar>
-    <v-navigation-drawer v-model="drawer" v-model:mini-variant="mini" class="bg-primary margen-top" width="170">
+    <v-navigation-drawer v-model="drawer" v-model:mini-variant="mini" class="bg-primary margen-top" width="60">
       <v-list theme="dark">
         <v-list-item class="px-2">
           <template v-slot:prepend>
