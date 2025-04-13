@@ -4,9 +4,6 @@
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" class="text-grey"></v-app-bar-nav-icon>
       <v-img src="/assets/posawesome/js/posapp/components/pos/pos.png" alt="POS Awesome" max-width="32" class="mr-2"
         color="primary"></v-img>
-      <v-toolbar-title @click="go_desk" style="cursor: pointer" class="text-uppercase text-primary">
-        <span class="font-weight-light">{{__('ERP System')}}</span> <!-- Code Modified by Salah -->
-      </v-toolbar-title>
 
       <v-spacer></v-spacer>
       <v-btn style="cursor: unset" variant="text" color="primary">
@@ -52,7 +49,7 @@
                 <v-list-item-title>{{ __('Logout') }}</v-list-item-title>
 
               </v-list-item>
-              <v-list-item @click="go_about">
+              <v-list-item @click="go_desk">
                 <template v-slot:prepend>
                   <v-icon icon="mdi-information-outline"></v-icon>
                 </template>
