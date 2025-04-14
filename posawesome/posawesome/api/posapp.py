@@ -357,13 +357,15 @@ def get_root_of(doctype):
 
 @frappe.whitelist()
 def get_items_groups():
-	return frappe.get_all(
-	    "Item Group",
-	    filters={"is_group": 0},
-	    fields=["name", "custom_group_color"],
-	    order_by="name asc",
-	    limit_page_length=200
-	)
+    return frappe.db.sql(
+        """
+        select name 
+        from `tabItem Group`
+        where is_group = 0
+        order by name
+        LIMIT 0, 200 """,
+        as_dict=1,
+    )
 
 
 def get_customer_groups(pos_profile):
