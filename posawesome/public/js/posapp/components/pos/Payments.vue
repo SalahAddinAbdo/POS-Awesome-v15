@@ -46,29 +46,11 @@
 			  hide-details
 			  :rules="[isNumber]"
 			  :prefix="currencySymbol(invoice_doc.currency)"
-			  @focus="popupVisible = true; activeKeypadIdx = payment.idx; selectedPayment = payment"
+			  @focus="setActivePayment(payment)"
 			  :readonly="invoice_doc.is_return">
 			</v-text-field>						
             </v-col>
-			<v-menu
-			  v-if="activeKeypadIdx === payment.idx" v-model="popupVisible"
-			  :close-on-content-click="false"
-				@click:outside="popupVisible = false"
-			  activator="parent"
-			  offset-y
-			>
-			<v-card class="pa-2 popup-numbers" style="min-width: 300px; max-width: 50%;" @click.stop>
-				<v-row dense>
-				  <v-col cols="4" v-for="n in 9" :key="n">
-					<v-btn block @click="appendNumber(n)">{{ n }}</v-btn>
-				  </v-col>
-					<v-col cols="4"><v-btn block @click="clearAmount()">C</v-btn></v-col>
-				  <v-col cols="4"><v-btn block @click="appendNumber(0)">0</v-btn></v-col>
-				  <v-col cols="4"><v-btn block color="success" @click="popupVisible = false">{{__("OK")}}</v-btn></v-col>
-				</v-row>
-			  </v-card>
-			</v-menu>
-			<!-- End New Code by Salah -->									
+									
             <v-col v-if="!is_mpesa_c2b_payment(payment)" :cols="6
               ? (payment.type != 'Phone' ||
                 payment.amount == 0 ||
@@ -135,6 +117,8 @@
               disabled></v-text-field>
           </v-col>
         </v-row>
+        
+        
         <v-divider></v-divider>
 
         <v-row class="px-1 py-0">
@@ -420,8 +404,7 @@ export default {
     mpesa_modes: [],
 	
 	activeKeypadIdx: null, // New Code added by Salah
-	popupVisible: false, // New Code added by Salah
-    selectedPayment: {}, // New Code added by Salah
+
   }),
 
   methods: {
@@ -951,15 +934,21 @@ export default {
       this.customer_credit_dict.push(advance);
     },
 	// Satrt New code by Salah
-	appendNumber(n) {
-		const current = this.invoice_doc.payments.find(p => p.idx === this.activeKeypadIdx)?.amount?.toString() || "";
-		const target = this.invoice_doc.payments.find(p => p.idx === this.activeKeypadIdx);
-		if (target) target.amount = parseFloat(current + n);
-	},
-	clearAmount() {
-	  const target = this.invoice_doc.payments.find(p => p.idx === this.activeKeypadIdx);
-	  if (target) target.amount = 0;
-	},
+    
+    setActivePayment(payment) {
+      this.activeKeypadIdx = payment.idx;
+    
+      const alreadyPaid = this.total_payments;
+      const invoiceTotal = this.invoice_doc.rounded_total || this.invoice_doc.grand_total;
+      const remaining = this.flt(invoiceTotal - alreadyPaid, this.currency_precision);
+    
+      if (!payment.amount || payment.amount === 0) {
+        payment.amount = remaining > 0 ? remaining : 0;
+      }
+            // Emit event to make this field active in Invoice.vue
+      this.eventBus.emit('set_active_keypad_field', { object: payment, field: 'amount' });
+    },
+         
 	// End New code by Salah
   },
 
@@ -1058,6 +1047,12 @@ export default {
     this.$nextTick(function () {
       this.eventBus.on("send_invoice_doc_payment", (invoice_doc) => {
         this.invoice_doc = invoice_doc;
+        
+        // Auto-select the first payment method for keypad
+        if (invoice_doc.payments?.length) {
+          this.activeKeypadIdx = invoice_doc.payments[0].idx;
+        }
+        
         const default_payment = this.invoice_doc.payments.find(
           (payment) => payment.default == 1
         );
@@ -1195,3 +1190,11 @@ export default {
 };
 
 </script>
+
+<style scoped>
+.fixed-keypad {
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+</style>
