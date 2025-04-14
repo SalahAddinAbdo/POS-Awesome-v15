@@ -47,19 +47,12 @@
 
 #### Self Hosting:
 
-1. `bench get-app branch version-15 https://github.com/SalahAddinAbdo/POS-Awesome-v15.git`
+1. `bench get-app https://github.com/SalahAddinAbdo/POS-Awesome-v15.git`
 2. `bench setup requirements`
 3. `bench build --app posawesome`
 4. `bench restart`
 5. `bench --site [your.site.name] install-app posawesome`
 6. `bench --site [your.site.name] migrate`
-
----
-
-### New Features and Bug Report:
-
-- Please Create Github Issue from [here](https://github.com/yrestom/POS-Awesome/issues/new/choose) after checking the existing issues
-- For paid features, you can email me [here](mailto:info@totrox.com)
 
 ---
 
