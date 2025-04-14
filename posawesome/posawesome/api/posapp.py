@@ -357,15 +357,13 @@ def get_root_of(doctype):
 
 @frappe.whitelist()
 def get_items_groups():
-    return frappe.db.sql(
-        """
-        select name 
-        from `tabItem Group`
-        where is_group = 0
-        order by name
-        LIMIT 0, 200 """,
-        as_dict=1,
-    )
+	return frappe.get_all(
+	    "Item Group",
+	    filters={"is_group": 0},
+	    fields=["name", "custom_group_color"],
+	    order_by="name asc",
+	    limit_page_length=200
+	)
 
 
 def get_customer_groups(pos_profile):
@@ -1059,6 +1057,9 @@ def create_customer(
     customer_type=None,
     gender=None,
     method="create",
+	address_line1=None,
+    city=None,
+    country=None,
 ):
     pos_profile = json.loads(pos_profile_doc)
     if method == "create":
@@ -1087,6 +1088,22 @@ def create_customer(
             else:
                 customer.territory = "All Territories"
             customer.save()
+			
+			# Address creation (optional)
+            if address_line1 or city:
+                args = {
+                    "name": f"{customer.customer_name} - Shipping",
+                    "doctype": "Customer",
+                    "customer": customer.name,
+                    "address_line1": address_line1 or "",
+                    "address_line2": "",
+                    "city": city or "",
+                    "state": "",
+                    "pincode": "",
+                    "country": country or "",
+                }
+                make_address(json.dumps(args))
+			
             return customer
         else:
             frappe.throw(_("Customer already exists"))
@@ -1107,7 +1124,35 @@ def create_customer(
             set_customer_info(customer_doc.name, "mobile_no", mobile_no)
         if email_id != customer_doc.email_id:
             set_customer_info(customer_doc.name, "email_id", email_id)
-        return customer_doc
+        
+		# Address update or creation
+        existing_address_name = frappe.db.get_value(
+            "Dynamic Link",
+            {"link_doctype": "Customer", "link_name": customer_id},
+            "parent"
+        )
+
+        if existing_address_name:
+            address_doc = frappe.get_doc("Address", existing_address_name)
+            address_doc.address_line1 = address_line1 or ""
+            address_doc.city = city or ""
+            address_doc.country = country or ""
+            address_doc.save()
+        elif address_line1 or city:
+            args = {
+                "name": f"{customer_doc.customer_name} - Shipping",
+                "doctype": "Customer",
+                "customer": customer_doc.name,
+                "address_line1": address_line1 or "",
+                "address_line2": "",
+                "city": city or "",
+                "state": "",
+                "pincode": "",
+                "country": country or "",
+            }
+            make_address(json.dumps(args))
+		
+		return customer_doc
 
 
 @frappe.whitelist()
