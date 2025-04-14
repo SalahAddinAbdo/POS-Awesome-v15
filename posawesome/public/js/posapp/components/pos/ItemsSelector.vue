@@ -19,10 +19,7 @@
             : {{ appliedOffersCount }}
             {{ __("Applied") }}</v-btn>
         </v-col>
-		<v-col cols="12">
-          <v-select :items="items_group" :label="frappe._('Items Group')" density="compact" variant="outlined"
-            hide-details v-model="item_group" v-on:update:model-value="search_onchange"></v-select>
-        </v-col> <!-- Reorderd by Salah -->
+
 		<v-col cols="12" class="pt-0 mt-0">
 			<v-row class="overflow-y-auto overflow-y-auto-fixmagin" style="max-height: 20vh; margin: 0;">
 			  <v-col
@@ -39,7 +36,7 @@
 				  outlined
 				  tile
 				  @click="selectItemGroup(itemGroup)"
-				  :color="itemGroup === item_group ? 'primary lighten-5' : ''">
+				  :color="itemGroup === item_group ? 'primary lighten-5' : 'white'">
 				  <v-card-title>{{ itemGroup }}</v-card-title>
 				</v-card>
 			  </v-col>
@@ -54,12 +51,12 @@
         <v-col class="pb-0 mb-2">
           <v-text-field density="compact" clearable autofocus variant="outlined" color="primary"
             :label="frappe._('Search Items')" hint="Search by item code, serial number, batch no or barcode"
-            bg-color="white" hide-details v-model="debounce_search" @keydown.esc="esc_event"
+            bg-color="white" hide-details v-model="debounce_search" @focus="setActiveFieldForKeypad('debounce_search')" @keydown.esc="esc_event"
             @keydown.enter="search_onchange" ref="debounce_search"></v-text-field>
         </v-col>
         <v-col cols="3" class="pb-0 mb-2" v-if="pos_profile.posa_input_qty">
           <v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('QTY')" bg-color="white"
-            hide-details v-model.number="qty" type="number" @keydown.enter="enter_event"
+            hide-details v-model.number="qty" type="number" @focus="setActiveFieldForKeypad('qty')" @keydown.enter="enter_event"
             @keydown.esc="esc_event"></v-text-field>
         </v-col>
         <v-col cols="2" class="pb-0 mb-2" v-if="pos_profile.posa_new_line">
@@ -123,9 +120,9 @@ export default {
     pos_profile: "",
     flags: {},
     items_view: "list",
-    item_group: "ALL",
+    item_group: null,
     loading: false,
-    items_group: ["ALL"],
+    items_group: [],
     items: [],
     search: "",
     first_search: "",
@@ -163,6 +160,14 @@ export default {
     show_coupons() {
       this.eventBus.emit("show_coupons", "true");
     },
+    
+    setActiveFieldForKeypad(fieldName) {
+      this.eventBus.emit("set_active_keypad_field", {
+        object: this,
+        field: fieldName
+      });
+    },
+    
     get_items() {
       if (!this.pos_profile) {
         console.error("No POS Profile");
@@ -176,7 +181,7 @@ export default {
       if (search) {
         sr = search;
       }
-      if (vm.item_group != "ALL") {
+      if (vm.item_group) {
         gr = vm.item_group.toLowerCase();
       }
       if (
@@ -349,11 +354,7 @@ export default {
     },
     search_onchange() {
       const vm = this;
-      if (vm.pos_profile.pose_use_limit_search) {
-        vm.get_items();
-      } else {
-        vm.enter_event();
-      }
+      vm.get_items();
     },
     get_item_qty(first_search) {
       let scal_qty = Math.abs(this.qty);
@@ -473,10 +474,15 @@ export default {
 
       return combinations;
     },
-	selectItemGroup(itemGroup) {
-      this.item_group = itemGroup;
-      // Trigger search or other actions based on the selected item group
-      this.search_onchange();  // New code added by Salah
+	  selectItemGroup(itemGroup) {
+      if (this.item_group === itemGroup) {
+        // Second click, unselect the group
+        this.item_group = null;
+      } else {
+        // First click, select the group
+        this.item_group = itemGroup;
+      }
+      this.search_onchange();
     },
   },
 
@@ -486,7 +492,7 @@ export default {
       if (!this.pos_profile.pose_use_limit_search) {
         let filtred_list = [];
         let filtred_group_list = [];
-        if (this.item_group != "ALL") {
+        if (this.item_group) {
           filtred_group_list = this.items.filter((item) =>
             item.item_group
               .toLowerCase()
