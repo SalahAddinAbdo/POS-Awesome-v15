@@ -45,10 +45,6 @@
 
 ### How to Install
 
-#### ASAERP:
-
-One-click installation is available if you are hosting on [ASAERP](https://asaerp.com) from [here](https://asaerp.com/dashboard/marketplace)
-
 #### Self Hosting:
 
 1. `bench get-app branch version-15 https://github.com/SalahAddinAbdo/POS-Awesome-v15.git`
