@@ -10,7 +10,11 @@
         <span right>{{ pos_profile.name }}</span>
       </v-btn>
       <div class="text-center">
-        <v-menu target="[y]">
+        <v-menu
+          location="bottom end"
+          origin="top right"
+          offset-y
+        >
           <template v-slot:activator="{ props }">
             <v-btn color="primary" theme="dark" variant="text" v-bind="props">{{__('Menu')}}</v-btn> <!-- Code Modified by Salah -->
           </template>
