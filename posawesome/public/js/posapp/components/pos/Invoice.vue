@@ -23,6 +23,35 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    
+    <v-card class="fixed-keypad pa-2 mt-2">
+      <v-row dense>
+        <!-- First Row -->
+        <v-col cols="3"><v-btn block @click="pressKey('1')">1</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('2')">2</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('3')">3</v-btn></v-col>
+        <v-col cols="3"><v-btn block color="error" @click="pressKey('C')">C</v-btn></v-col>
+    
+        <!-- Second Row -->
+        <v-col cols="3"><v-btn block @click="pressKey('4')">4</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('5')">5</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('6')">6</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('0')">0</v-btn></v-col>
+    
+        <!-- Third Row -->
+        <v-col cols="3"><v-btn block @click="pressKey('7')">7</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('8')">8</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('9')">9</v-btn></v-col>
+        <v-col cols="3"><v-btn block @click="pressKey('.')">.</v-btn></v-col>
+        
+    
+        <!-- Fourth Row: Full-width Backspace -->
+        <v-col cols="12"><v-btn block style="background-color: #9c9b9b; color:#fff;" @click="pressKey('Backspace')">
+        &larr; Backspace
+        </v-btn></v-col>
+      </v-row>
+    </v-card>
+    
     <v-card style="max-height: 70vh; height: 70vh" class="cards my-0 py-0 mt-3 bg-grey-lighten-5">
       <v-row align="center" class="items px-2 py-1">
         <v-col v-if="pos_profile.posa_allow_sales_order" cols="9" class="pb-2 pr-0">
@@ -126,7 +155,7 @@
                 </v-col>
                 <v-col cols="4">
                   <v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('QTY')"
-                    bg-color="white" hide-details :model-value="formatFloat(item.qty)" @change="
+                    bg-color="white" hide-details :model-value="formatFloat(item.qty)" @focus="() => setActiveField(item, 'qty')" @change="
                       [
                         setFormatedFloat(item, 'qty', null, false, $event),
                         calc_stock_qty(item, $event),
@@ -145,7 +174,7 @@
                 <v-col cols="4">
                   <v-text-field density="compact" variant="outlined" color="primary" :label="frappe._('Rate')"
                     bg-color="white" hide-details :prefix="currencySymbol(pos_profile.currency)"
-                    :model-value="formatCurrency(item.rate)" @change="
+                    :model-value="formatCurrency(item.rate)" @focus="() => setActiveField(item, 'rate')" @change="
                       [
                         setFormatedCurrency(
                           item,
@@ -154,7 +183,7 @@
                           false,
                           $event
                         ),
-                        calc_prices(item, $event),
+                        calc_prices(item, $event.target.value, $event),
                       ]
                       " :rules="[isNumber]" id="rate" :disabled="!!item.posa_is_offer ||
                         !!item.posa_is_replace ||
@@ -168,7 +197,7 @@
                 <v-col cols="4">
                   <v-text-field density="compact" variant="outlined" color="primary"
                     :label="frappe._('Discount Percentage')" bg-color="white" hide-details
-                    :model-value="formatFloat(item.discount_percentage)" @change="
+                    :model-value="formatFloat(item.discount_percentage)" @focus="() => setActiveField(item, 'discount_percentage')" @change="
                       [
                         setFormatedCurrency(
                           item,
@@ -177,7 +206,7 @@
                           true,
                           $event
                         ),
-                        calc_prices(item, $event),
+                        calc_prices(item, $event.target.value, $event),
                       ]
                       " :rules="[isNumber]" id="discount_percentage" :disabled="!!item.posa_is_offer ||
                         !!item.posa_is_replace ||
@@ -191,7 +220,7 @@
                 <v-col cols="4">
                   <v-text-field density="compact" variant="outlined" color="primary"
                     :label="frappe._('Discount Amount')" bg-color="white" hide-details
-                    :model-value="formatCurrency(item.discount_amount)" :rules="[isNumber]" @change="
+                    :model-value="formatCurrency(item.discount_amount)" :rules="[isNumber]" @focus="() => setActiveField(item, 'discount_amount')" @change="
                       [
                         setFormatedCurrency(
                           item,
@@ -201,7 +230,7 @@
                           $event
                         ),
                         ,
-                        calc_prices(item, $event),
+                        calc_prices(item, $event.target.value, $event),
                       ]
                       " :prefix="currencySymbol(pos_profile.currency)" id="discount_amount" :disabled="!!item.posa_is_offer ||
                         !!item.posa_is_replace ||
@@ -324,7 +353,6 @@
             <v-col v-if="!pos_profile.posa_use_percentage_discount" cols="6" class="pa-1">
 				<v-text-field
 				  v-model.number="discount_amount"
-				  @click="openDiscountPopup(false)"
 				  :label="frappe._('Additional Discount')"
 				  :prefix="currencySymbol(pos_profile.currency)"
 				  :rules="[isNumber]"
@@ -334,12 +362,12 @@
 				  color="warning"
 				  ref="discount"
 				  :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount || discount_percentage_offer_name"
+          @focus="() => setActiveField(this, 'discount_amount')"
 				></v-text-field>
             </v-col>
             <v-col v-if="pos_profile.posa_use_percentage_discount" cols="6" class="pa-1">
 				<v-text-field
 				  v-model.number="additional_discount_percentage"
-				  @click="openDiscountPopup(true)"
 				  :label="frappe._('Additional Discount %')"
 				  suffix="%"
 				  :rules="[isNumber]"
@@ -349,6 +377,7 @@
 				  hide-details
 				  ref="percentage_discount"
 				  :disabled="!pos_profile.posa_allow_user_to_edit_additional_discount || discount_percentage_offer_name"
+          @focus="() => setActiveField(this, 'additional_discount_percentage')"
 				></v-text-field>
             </v-col>
             <v-col cols="6" class="pa-1 mt-2">
@@ -363,7 +392,8 @@
                 color="success"></v-text-field>
             </v-col>
           </v-row>
-        </v-col>
+        </v-col>    
+        
         <v-col cols="5">
           <v-row no-gutters class="pa-1 pt-2 pl-0">
             <v-col cols="6" class="pa-1">
@@ -399,29 +429,8 @@
         </v-col>
       </v-row>
 	  
-		<!-- Discount Popup Dialog -->
-		<v-dialog v-model="showDiscountPopup" max-width="300">
-		  <v-card>
-			<v-card-title>{{ __('Enter Discount') }}</v-card-title>
-			<v-card-text>
-			  <v-text-field
-				v-model.number="tempDiscountValue"
-				:label="discountIsPercentage ? __('Discount %') : __('Discount Amount')"
-				type="number"
-				hide-details
-				suffix="%"
-				:prefix="!discountIsPercentage ? currencySymbol(pos_profile.currency) : ''"
-			  ></v-text-field>
-			</v-card-text>
-			<v-card-actions>
-			  <v-spacer></v-spacer>
-			  <v-btn color="primary" @click="applyDiscountPopup">{{ __('Apply') }}</v-btn>
-			  <v-btn color="grey" @click="showDiscountPopup = false">{{ __('Cancel') }}</v-btn>
-			</v-card-actions>
-		  </v-card>
-		</v-dialog>
-	  
     </v-card>
+        
   </div>
 </template>
 
@@ -477,10 +486,10 @@ export default {
         { title: __("Amount"), key: "amount", align: "center" },
         { title: __("Offer?"), key: "posa_is_offer", align: "center" },
       ],
-	  
-	  	showDiscountPopup: false,
-		tempDiscountValue: 0,
-		discountIsPercentage: false,
+	     
+        
+      activeField: null,
+      activeObject: null,
     };
   },
 
@@ -569,6 +578,46 @@ export default {
       }
       this.calc_stock_qty(item, item.qty);
       this.$forceUpdate();
+    },
+    
+    
+    pressKey(key) {
+      if (!this.activeObject || !this.activeField) return;
+    
+      let value = this.activeObject[this.activeField]?.toString() || "";
+    
+      if (key === "Backspace") {
+        value = value.slice(0, -1);
+      } else if (key === "C") {
+        value = "";
+      
+        // Special logic to reset item discount and rate
+        if (this.activeField === "discount_percentage" || this.activeField === "discount_amount") {
+          const item = this.activeObject;
+          item.discount_percentage = 0;
+          item.discount_amount = 0;
+          item.rate = this.flt(item.price_list_rate, this.currency_precision);
+          this.calc_stock_qty(item, item.qty);
+          this.handelOffers(); // ? Re-evaluate offers
+          this.$forceUpdate();
+        }
+      } else if (key === ".") {
+        if (!value.includes(".")) {
+          value += ".";
+        }
+      } else {
+        value += key;
+      }
+    
+      const isValid = /^(\d+)?(\.\d*)?$/.test(value);
+      if (isValid) {
+        this.activeObject[this.activeField] = value;
+      }
+    },
+
+    setActiveField(object, field) {
+      this.activeObject = object;
+      this.activeField = field;
     },
 
     add_item(item) {
@@ -1508,42 +1557,61 @@ export default {
     },
 
     calc_prices(item, value, $event) {
-      if (event.target.id === "rate") {
-        item.discount_percentage = 0;
-        if (value < item.price_list_rate) {
-          item.discount_amount = this.flt(
-            this.flt(item.price_list_rate) - flt(value),
-            this.currency_precision
-          );
-        } else if (value < 0) {
-          item.rate = item.price_list_rate;
-          item.discount_amount = 0;
-        } else if (value > item.price_list_rate) {
-          item.discount_amount = 0;
+      if (!$event?.target?.id) return;
+      
+      const fieldId = $event.target.id;
+      const priceListRate = flt(item.price_list_rate, this.currency_precision);
+      let newValue = flt(value, this.currency_precision);
+    
+      // Handle negative values
+      if (newValue < 0) {
+        newValue = 0;
+        this.eventBus.emit("show_message", {
+          title: __("Negative values not allowed"),
+          color: "error"
+        });
+      }
+    
+      try {
+        // Field-wise calculations
+        switch(fieldId) {
+          case "rate":
+            item.rate = this.flt(newValue, this.currency_precision);
+            item.discount_amount = this.flt(priceListRate - item.rate, this.currency_precision);
+            item.discount_percentage = this.flt((item.discount_amount / priceListRate) * 100, this.float_precision);
+            break;
+    
+          case "discount_amount":
+            newValue = Math.min(newValue, priceListRate);
+            item.discount_amount = this.flt(newValue, this.currency_precision);
+            item.rate = this.flt(priceListRate - item.discount_amount, this.currency_precision);
+            item.discount_percentage = this.flt((item.discount_amount / priceListRate) * 100, this.float_precision);
+            break;
+    
+          case "discount_percentage":
+            newValue = Math.min(newValue, 100);
+            item.discount_percentage = this.flt(newValue, this.float_precision);
+            item.discount_amount = this.flt((priceListRate * item.discount_percentage) / 100, this.currency_precision);
+            item.rate = this.flt(priceListRate - item.discount_amount, this.currency_precision);
+            break;
         }
-      } else if (event.target.id === "discount_amount") {
-        if (value < 0) {
-          item.discount_amount = 0;
-          item.discount_percentage = 0;
-        } else {
-          item.rate = flt(item.price_list_rate) - flt(value);
-          item.discount_percentage = 0;
+    
+        // Ensure rate doesn't go below zero
+        if (item.rate < 0) {
+          item.rate = 0;
+          item.discount_amount = priceListRate;
+          item.discount_percentage = 100;
         }
-      } else if (event.target.id === "discount_percentage") {
-        if (value < 0) {
-          item.discount_amount = 0;
-          item.discount_percentage = 0;
-        } else {
-          item.rate = this.flt(
-            flt(item.price_list_rate) -
-            (flt(item.price_list_rate) * flt(value)) / 100,
-            this.currency_precision
-          );
-          item.discount_amount = this.flt(
-            flt(item.price_list_rate) - flt(+item.rate),
-            this.currency_precision
-          );
-        }
+    
+        // Update stock calculations
+        this.calc_stock_qty(item, item.qty);
+        this.$forceUpdate();
+      } catch (error) {
+        console.error("Error calculating prices:", error);
+        this.eventBus.emit("show_message", {
+          title: __("Error calculating prices"),
+          color: "error"
+        });
       }
     },
 
@@ -2513,21 +2581,6 @@ export default {
       }
     },
 	
-	openDiscountPopup(isPercentage) {
-	this.discountIsPercentage = isPercentage;
-	this.tempDiscountValue = isPercentage
-	  ? this.additional_discount_percentage
-	  : this.discount_amount;
-	this.showDiscountPopup = true;
-	},
-	applyDiscountPopup() {
-	if (this.discountIsPercentage) {
-	  this.additional_discount_percentage = this.tempDiscountValue;
-	} else {
-	  this.discount_amount = this.tempDiscountValue;
-	}
-	this.showDiscountPopup = false;
-	},
   },
 
   mounted() {
@@ -2589,6 +2642,12 @@ export default {
     this.eventBus.on("set_new_line", (data) => {
       this.new_line = data;
     });
+    
+    this.eventBus.on('set_active_keypad_field', ({ object, field }) => {
+      this.activeField = field;
+      this.activeObject = object;
+    });
+    
   },
   beforeUnmount() {
     evntBus.$off("register_pos_profile");
@@ -2645,6 +2704,35 @@ export default {
     items: {
       deep: true,
       handler(items) {
+      
+        for (const item of items) {
+          if (item && item.price_list_rate) {
+            const rate = flt(item.price_list_rate);
+            const discountAmount = flt(item.discount_amount);
+            const discountPercentage = flt(item.discount_percentage);
+    
+            // Recalculate rate based on discount percentage
+            if (
+              discountPercentage &&
+              this.activeField === "discount_percentage" &&
+              this.activeObject === item
+            ) {
+              item.discount_amount = this.flt((rate * discountPercentage) / 100, this.currency_precision);
+              item.rate = this.flt(rate - item.discount_amount, this.currency_precision);
+            }
+    
+            // Recalculate rate based on discount amount
+            if (
+              discountAmount &&
+              this.activeField === "discount_amount" &&
+              this.activeObject === item
+            ) {
+              item.discount_percentage = this.flt((discountAmount / rate) * 100, this.float_precision);
+              item.rate = this.flt(rate - discountAmount, this.currency_precision);
+            }
+          }
+        }
+      
         this.handelOffers();
         this.$forceUpdate();
       },
@@ -2663,5 +2751,9 @@ export default {
 
 .disable-events {
   pointer-events: none;
+}
+
+.fixed-keypad {
+  background-color: #f9f9f9;
 }
 </style>
