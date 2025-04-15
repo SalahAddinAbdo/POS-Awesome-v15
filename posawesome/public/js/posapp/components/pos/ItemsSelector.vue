@@ -2,53 +2,56 @@
   <div>
      <v-card class="cards mb-0 mt-3 pa-2 bg-grey-lighten-5">
       <v-row no-gutters align="center" justify="center">
+	<v-col cols="12" class="pt-0 mt-0">
+		<v-row class="overflow-y-auto overflow-y-auto-fixmagin" style="max-height: 20vh; margin: 0;">
+		  <v-col
+			v-for="itemGroup in items_group"
+			:key="itemGroup"
+			xl="2"
+			lg="3"
+			md="6"
+			sm="6"
+			cols="6"
+			class="d-flex justify-center">
+			<v-card
+			  class="mx-2 my-2"
+			  outlined
+			  tile
+			  @click="selectItemGroup(itemGroup)"
+			  :color="itemGroup === item_group ? 'primary lighten-5' : 'white'">
+			  <v-card-title>{{ itemGroup }}</v-card-title>
+			</v-card>
+		  </v-col>
+		</v-row>
+	    </v-col> <!-- New code by Salah -->
+      </v-row>
+    </v-card> <!-- Reorderd by Salah -->
+    <v-card class="selection mx-auto bg-grey-lighten-5 mt-3" style="max-height: 75vh; height: 75vh">
+      <v-progress-linear :active="loading" :indeterminate="loading" absolute :location="top"
+        color="info"></v-progress-linear>
+        <div class="items-head-fields">
+      <v-row class="items px-2 py-1 items-head-field-1">
+        
         <v-col cols="3" class="mt-1">
           <v-btn-toggle v-model="items_view" color="primary" group density="compact" rounded>
             <v-btn size="small" value="list">{{ __("List") }}</v-btn>
             <v-btn size="small" value="card">{{ __("Card") }}</v-btn>
           </v-btn-toggle>
         </v-col>
-        <v-col cols="4" class="mt-2">
+        <v-col cols="3" class="mt-2">
           <v-btn size="small" block color="primary" variant="text" @click="show_coupons">{{ couponsCount }} {{
             __("Coupons")
             }}</v-btn>
         </v-col>
-        <v-col cols="5" class="mt-2">
+        <v-col cols="3" class="mt-2">
           <v-btn size="small" block color="primary" variant="text" @click="show_offers">{{ offersCount }} {{
             __("Offers") }}
             : {{ appliedOffersCount }}
             {{ __("Applied") }}</v-btn>
         </v-col>
-
-		<v-col cols="12" class="pt-0 mt-0">
-			<v-row class="overflow-y-auto overflow-y-auto-fixmagin" style="max-height: 20vh; margin: 0;">
-			  <v-col
-				v-for="itemGroup in items_group"
-				:key="itemGroup"
-				xl="2"
-				lg="3"
-				md="6"
-				sm="6"
-				cols="6"
-				class="d-flex justify-center">
-				<v-card
-				  class="mx-2 my-2"
-				  outlined
-				  tile
-				  @click="selectItemGroup(itemGroup)"
-				  :color="itemGroup === item_group ? 'primary lighten-5' : 'white'">
-				  <v-card-title>{{ itemGroup }}</v-card-title>
-				</v-card>
-			  </v-col>
-			</v-row>
-		  </v-col> <!-- New code by Salah -->
-      </v-row>
-    </v-card> <!-- Reorderd by Salah -->
-    <v-card class="selection mx-auto bg-grey-lighten-5 mt-3" style="max-height: 75vh; height: 75vh">
-      <v-progress-linear :active="loading" :indeterminate="loading" absolute :location="top"
-        color="info"></v-progress-linear>
-      <v-row class="items px-2 py-1">
-        <v-col class="pb-0 mb-2">
+        </v-row>
+        <v-row class="items px-2 py-1 items-head-field-2">
+        <v-col class="pb-0 mb-2  search-items-field">
           <v-text-field density="compact" clearable autofocus variant="outlined" color="primary"
             :label="frappe._('Search Items')" hint="Search by item code, serial number, batch no or barcode"
             bg-color="white" hide-details v-model="debounce_search" @focus="setActiveFieldForKeypad('debounce_search')" @keydown.esc="esc_event"
@@ -59,10 +62,13 @@
             hide-details v-model.number="qty" type="number" @focus="setActiveFieldForKeypad('qty')" @keydown.enter="enter_event"
             @keydown.esc="esc_event"></v-text-field>
         </v-col>
-        <v-col cols="2" class="pb-0 mb-2" v-if="pos_profile.posa_new_line">
+        <v-col cols="3" class="pb-0 mb-2" v-if="pos_profile.posa_new_line">
           <v-checkbox v-model="new_line" color="accent" value="true" :label="frappe._('NLine')" density="default"
             hide-details></v-checkbox> <!-- Code Modified by Salah -->
         </v-col>
+        </v-row>
+        </div>
+        <v-row class="items px-2 py-1">
         <v-col cols="12" class="pt-0 mt-0">
           <div fluid class="items" v-if="items_view == 'card'">
             <v-row density="default" class="overflow-y-auto" style="max-height: 67vh">
