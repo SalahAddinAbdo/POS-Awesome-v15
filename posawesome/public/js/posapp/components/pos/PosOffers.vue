@@ -11,10 +11,9 @@
           <template v-slot:item.offer_applied="{ item }">
             <v-checkbox-btn @click="forceUpdateItem" :v-model="item.offer_applied" :disabled="(item.offer == 'Give Product' &&
               !item.give_item &&
-              (!offer.replace_cheapest_item || !offer.replace_item)) ||
-              (item.offer == 'Grand Total' &&
-                discount_percentage_offer_name &&
-                discount_percentage_offer_name != item.name)
+              (!item.replace_cheapest_item || !item.replace_item)) ||
+              (item.offer === 'Grand Total' &&
+                pos_offers.some(o => o.offer_applied && o.offer === 'Grand Total' && o.name !== item.name))
               "></v-checkbox-btn>
           </template>
           <template v-slot:expanded-item="{ headers, item }">
@@ -116,10 +115,18 @@ export default {
           pos_offer.items = offer.items;
           if (
             pos_offer.offer === 'Grand Total' &&
-            !this.discount_percentage_offer_name
+            !this.pos_offers.some(
+              o => o.offer_applied && o.offer === 'Grand Total' && o.name !== pos_offer.name
+            )
           ) {
             pos_offer.offer_applied = !!pos_offer.auto;
+            
+            if (pos_offer.offer_applied) {
+              this.discount_percentage_offer_name = pos_offer.name;
+            }
           }
+          
+          
           if (
             offer.apply_on == 'Item Group' &&
             offer.apply_type == 'Item Group' &&
@@ -136,8 +143,9 @@ export default {
           if (offer.apply_type == 'Item Code') {
             newOffer.give_item = offer.apply_item_code || 'Nothing';
           }
+          
           if (offer.offer_applied) {
-            newOffer.offer_applied == !!offer.offer_applied;
+            newOffer.offer_applied = !!offer.offer_applied;
           } else {
             if (
               offer.apply_type == 'Item Group' &&
@@ -148,16 +156,31 @@ export default {
               newOffer.offer_applied = false;
             } else if (
               offer.offer === 'Grand Total' &&
-              this.discount_percentage_offer_name
+              this.pos_offers.some(
+                o => o.offer_applied && o.offer === 'Grand Total'
+              )
             ) {
               newOffer.offer_applied = false;
             } else {
               newOffer.offer_applied = !!offer.auto;
             }
           }
-          if (newOffer.offer == 'Give Product' && !newOffer.give_item) {
-            newOffer.give_item = this.get_give_items(newOffer)[0].item_code;
+          
+          if (
+            newOffer.offer === 'Grand Total' &&
+            newOffer.offer_applied
+          ) {
+            this.discount_percentage_offer_name = newOffer.name;
           }
+          
+          if (newOffer.offer == 'Give Product' && !newOffer.give_item) {
+            const giveItems = this.get_give_items(newOffer);
+            if (giveItems.length > 0) {
+              newOffer.give_item = giveItems[0].item_code;
+            }
+           }
+          
+          
           this.pos_offers.push(newOffer);
           this.eventBus.emit('show_message', {
             title: __('New Offer Available'),
@@ -250,6 +273,27 @@ export default {
     this.eventBus.on('set_all_items', (data) => {
       this.allItems = data;
     });
+    
+    this.eventBus.on('reset_offers', () => {
+      this.pos_offers.forEach((offer) => {
+        if (
+          offer.offer === 'Grand Total' &&
+          !this.pos_offers.some(o => o.offer_applied && o.offer === 'Grand Total' && o.name !== offer.name)
+        ) {
+          offer.offer_applied = !!offer.auto;
+    
+          if (offer.offer_applied) {
+            this.discount_percentage_offer_name = offer.name;
+          }
+        } else if (offer.offer === 'Grand Total') {
+          offer.offer_applied = false;
+        }
+      });
+    
+      this.handelOffers();
+    });
+    
+    
   },
 };
 </script>
