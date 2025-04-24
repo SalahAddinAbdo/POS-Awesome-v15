@@ -751,6 +751,8 @@ export default {
         ? "Order"
         : "Invoice";
       this.invoiceTypes = ["Invoice", "Order"];
+      this.eventBus.emit('reset_offers'); // ?? Ask PosOffers to re-evaluate offers
+      this.eventBus.emit('update_discount_percentage_offer_name', { value: null }); // ?? Clear the offer name tracker    
     },
 
     async cancel_invoice() {
