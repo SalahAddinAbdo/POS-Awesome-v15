@@ -582,6 +582,10 @@ export default {
             title: `${__('Invoice')} ${r.message.name} ${__('is Submitted')}`,
             color: "success",
           });
+          
+          // ✅ Add this line to trigger stock update
+          vm.eventBus.emit("invoice_submitted");
+          
           // Code modified by Salah
           frappe.utils.play_sound("submit");
           vm.addresses = [];
