@@ -212,6 +212,11 @@ export default {
           if (r.message) {
             vm.items = r.message;
             vm.eventBus.emit("set_all_items", vm.items);
+			
+			  if (!vm.pos_profile.pose_use_limit_search) {
+				vm.update_items_details(vm.items);
+			  }
+  
             vm.loading = false;
             console.info("Items Loaded");
             if (
@@ -625,6 +630,12 @@ export default {
     this.eventBus.on("update_cur_items_details", () => {
       this.update_cur_items_details();
     });
+	
+	// ✅ Add this to refresh qty after invoice submit
+	this.eventBus.on("invoice_submitted", () => {
+		this.update_items_details(this.items);
+	});
+	
     this.eventBus.on("update_offers_counters", (data) => {
       this.offersCount = data.offersCount;
       this.appliedOffersCount = data.appliedOffersCount;
