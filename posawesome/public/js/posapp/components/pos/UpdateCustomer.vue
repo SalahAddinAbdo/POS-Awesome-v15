@@ -214,7 +214,7 @@ export default {
           mobile_no: this.mobile_no,
           email_id: this.email_id,
           referral_code: this.referral_code,
-          birthday: frappe.format(this.birthday, { fieldtype: 'Date' }),
+          birthday: frappe.datetime.obj_to_str(this.birthday),
           customer_group: this.group,
           territory: this.territory,
           customer_type: this.customer_type,
@@ -232,7 +232,7 @@ export default {
                 text = __('Customer updated successfully.');
               }
               vm.eventBus.emit('show_message', {
-                text: text,
+                title: text,
                 color: 'success',
               });
               args.name = r.message.name;
