@@ -54,6 +54,7 @@ export default {
       payment: false,
       offers: false,
       coupons: false,
+      silent_print_socket: ''
     };
   },
 
@@ -149,15 +150,32 @@ export default {
         this.eventBus.emit('set_pos_settings', doc);
       });
     },
+
+    // pico silent print
+    async boot_silent_print_service(){
+      console.log("from: boot_silent_print_service ")
+      this.silent_print_socket = await frappe.silent_print.WebSocketPrinter.create();
+      console.log(this.silent_print_socket)
+      this.eventBus.emit('pico_register_silent_print', this.silent_print_socket);
+    },
   },
 
   mounted: function () {
     this.$nextTick(function () {
+      // pico silent print
+      this.boot_silent_print_service()
+
       this.check_opening_entry();
       this.get_pos_setting();
       this.eventBus.on('close_opening_dialog', () => {
         this.dialog = false;
       });
+
+      // pico silent print
+      // this.eventBus.on('pico_register_silent_print', (data) => {
+
+      // });
+
       this.eventBus.on('register_pos_data', (data) => {
         this.pos_profile = data.pos_profile;
         this.get_offers(this.pos_profile.name);
@@ -190,6 +208,9 @@ export default {
   },
   beforeUnmount() {
     evntBus.$off('close_opening_dialog');
+    // pico silent print
+    evntBus.$off('pico_register_silent_print');
+
     evntBus.$off('register_pos_data');
     evntBus.$off('LoadPosProfile');
     evntBus.$off('show_offers');

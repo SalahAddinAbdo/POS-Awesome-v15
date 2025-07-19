@@ -380,7 +380,7 @@ export default {
     loading: false,
     pos_profile: "",
     invoice_doc: "",
-	custom_order_type: "Dine-in", // New Code added by Salah
+	  custom_order_type: "Dine-in", // New Code added by Salah
     loyalty_amount: 0,
     credit_sales_due_date: new Date(frappe.datetime.now_date()),
     is_credit_sale: 0,
@@ -404,7 +404,7 @@ export default {
     mpesa_modes: [],
 	
 	activeKeypadIdx: null, // New Code added by Salah
-
+    silent_print_socket: '',
   }),
 
   methods: {
@@ -621,30 +621,87 @@ export default {
       });
     },
     load_print_page() {
-      const print_format =
-        this.pos_profile.print_format_for_online ||
-        this.pos_profile.print_format;
-      const letter_head = this.pos_profile.letter_head || 0;
-      const url =
-        frappe.urllib.get_base_url() +
-        "/printview?doctype=Sales%20Invoice&name=" +
-        this.invoice_doc.name +
-        "&trigger_print=1" +
-        "&format=" +
-        print_format +
-        "&no_letterhead=" +
-        letter_head;
-      const printWindow = window.open(url, "Print");
-      printWindow.addEventListener(
-        "load",
-        function () {
-          printWindow.print();
-          // printWindow.close();
-          // NOTE : uncomoent this to auto closing printing window
-        },
-        true
-      );
+      if(this.silent_print_socket){
+        this.silent_print_invoice(this.invoice_doc.name)
+      } else {
+        const print_format =
+          this.pos_profile.print_format_for_online ||
+          this.pos_profile.print_format;
+        const letter_head = this.pos_profile.letter_head || 0;
+        const url =
+          frappe.urllib.get_base_url() +
+          "/printview?doctype=Sales%20Invoice&name=" +
+          this.invoice_doc.name +
+          "&trigger_print=1" +
+          "&format=" +
+          print_format +
+          "&no_letterhead=" +
+          letter_head;
+        const printWindow = window.open(url, "Print");
+        printWindow.addEventListener(
+          "load",
+          function () {
+            printWindow.print();
+            // printWindow.close();
+            // NOTE : uncomoent this to auto closing printing window
+          },
+          true
+        );
+      }
     },
+    // pico silent print
+    async get_user_default_printer() {
+      try {
+          const { message } = await frappe.call(
+            "pico_silent_print.api.get_user_default_printer"
+          );
+          return message;
+      } catch (e) {
+          frappe.msgprint({
+            title    : __("Silent Print"),
+            indicator: "red",
+            message  : __(`Cannot get default printer for this user: <b>${frappe.user.name}</b>`),
+          });
+          throw e;
+      }
+    },
+    async silent_print_invoice(invoice_name){
+      console.log("from: silent_print_invoice- ",invoice_name)
+      const printer = await this.get_user_default_printer();
+      if (!printer) return;
+
+      const { message: { pdf_base64 } } = await frappe.call({
+          method : "pico_silent_print.api.create_pdf",
+          args : {
+            doctype : "Sales Invoice",
+            name : invoice_name,
+            printer,
+            no_letterhead: 1,
+          },
+      });
+
+      this.send_to_printer(printer.printer, pdf_base64);
+
+      // Extra item‑group slips for sales invoices
+      // if (this.frm.doctype === "Sales Invoice") {
+          const { message: itemPrints } = await frappe.call({
+              method: "pico_silent_print.api.create_item_groups_pdfs",
+              args  : { "invoice_name": invoice_name },
+          });
+          itemPrints.forEach(p =>
+            this.send_to_printer(p.printer_name, p.pdf_base64)
+          );
+        // }
+    },
+    send_to_printer(printerId, pdfBase64){
+      this.silent_print_socket.submit({
+            type        : printerId,
+            url         : "file.pdf",
+            file_content: pdfBase64,
+            id          : Date.now(),
+        });
+    },
+
     validate_due_date() {
       const today = frappe.datetime.now_date();
       const parse_today = Date.parse(today);
@@ -1049,6 +1106,11 @@ export default {
 
   mounted: function () {
     this.$nextTick(function () {
+      // pico silent print
+      this.eventBus.on('pico_register_silent_print', (data) => {
+        this.silent_print_socket = data
+      });
+
       this.eventBus.on("send_invoice_doc_payment", (invoice_doc) => {
         this.invoice_doc = invoice_doc;
         
@@ -1117,6 +1179,9 @@ export default {
     document.addEventListener("keydown", this.shortPay.bind(this));
   },
   beforeUnmount() {
+    // pico silent print
+    evntBus.$off("pico_register_silent_print");
+
     evntBus.$off("send_invoice_doc_payment");
     evntBus.$off("register_pos_profile");
     evntBus.$off("add_the_new_address");
