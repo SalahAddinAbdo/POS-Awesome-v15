@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import frappe
+#import frappe
 
 __version__ = "6.3.0"
 
