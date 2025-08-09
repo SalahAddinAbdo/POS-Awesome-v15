@@ -155,7 +155,7 @@ export default {
     async boot_silent_print_service(){
       console.log("from: boot_silent_print_service ")
       this.silent_print_socket = await frappe.silent_print.WebSocketPrinter.create();
-      console.log(this.silent_print_socket)
+      // console.log(this.silent_print_socket)
       this.eventBus.emit('pico_register_silent_print', this.silent_print_socket);
     },
   },
