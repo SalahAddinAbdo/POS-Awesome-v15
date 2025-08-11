@@ -179,7 +179,7 @@ export default {
     },
     print_last_invoice() {
       if (!this.last_invoice) return;
-      if(this.silent_print_socket){
+      if(this.silent_print_socket && this.silent_print_socket.isConnected() ){
         this.silent_print_invoice(this.last_invoice)
 
       } else {
@@ -240,7 +240,7 @@ export default {
       this.send_to_printer(printer.printer, pdf_base64);
 
       // Extra item‑group slips for sales invoices
-      // if (this.frm.doctype === "Sales Invoice") {
+      if (printer.print_invoice_items_groups) {
           const { message: itemPrints } = await frappe.call({
               method: "pico_silent_print.api.create_item_groups_pdfs",
               args  : { "invoice_name": invoice_name },
@@ -248,7 +248,7 @@ export default {
           itemPrints.forEach(p =>
             this.send_to_printer(p.printer_name, p.pdf_base64)
           );
-        // }
+        }
     },
     send_to_printer(printerId, pdfBase64){
       this.silent_print_socket.submit({
