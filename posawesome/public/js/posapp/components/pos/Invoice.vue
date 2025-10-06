@@ -490,7 +490,7 @@ export default {
         
       activeField: null,
       activeObject: null,
-      silent_print_socket: '',
+      silent_print_enabled: false,
     };
   },
 
@@ -2490,36 +2490,52 @@ export default {
         }, 0);
       }
     },
+    
     load_print_page(invoice_name) {
       if(!invoice_name) return;
-      if(this.silent_print_socket && this.silent_print_socket.isConnected()){
-          this.silent_print_invoice(invoice_name)
+      
+      let me = this;
+      if(this.silent_print_enabled && typeof qz === "object" && typeof qz.version === "string"){
+        frappe.pico.qz_connect()
+          .then(
+            function () {
+              me.silent_print_invoice(invoice_name)
+            },
+            function() {
+                console.error("zizooo:")
+                me.open_print_page(invoice_name)
+            }
+          )
 
       } else {
-        const print_format =
-          this.pos_profile.print_format_for_online ||
-          this.pos_profile.print_format;
-        const letter_head = this.pos_profile.letter_head || 0;
-        const url =
-          frappe.urllib.get_base_url() +
-          "/printview?doctype=Sales%20Invoice&name=" +
-          invoice_name +
-          "&trigger_print=1" +
-          "&format=" +
-          print_format +
-          "&no_letterhead=" +
-          letter_head;
-        const printWindow = window.open(url, "Print");
-        printWindow.addEventListener(
-          "load",
-          function () {
-            printWindow.print();
-            // printWindow.close();
-            // NOTE : uncomoent this to auto closing printing window
-          },
-          true
-        );
+        me.open_print_page(invoice_name)
       }
+
+    },
+    open_print_page(invoice_name){
+      const print_format =
+        this.pos_profile.print_format_for_online ||
+        this.pos_profile.print_format;
+      const letter_head = this.pos_profile.letter_head || 0;
+      const url =
+        frappe.urllib.get_base_url() +
+        "/printview?doctype=Sales%20Invoice&name=" +
+        invoice_name +
+        "&trigger_print=1" +
+        "&format=" +
+        print_format +
+        "&no_letterhead=" +
+        letter_head;
+      const printWindow = window.open(url, "Print");
+      printWindow.addEventListener(
+        "load",
+        function () {
+          printWindow.print();
+          // printWindow.close();
+          // NOTE : uncomoent this to auto closing printing window
+        },
+        true
+      );
     },
     print_draft_invoice() {
       if (!this.pos_profile.posa_allow_print_draft_invoices) {
@@ -2589,63 +2605,16 @@ export default {
       }
     },
     // pico silent print
-    async get_user_default_printer() {
-      try {
-          const { message } = await frappe.call(
-            "pico_silent_print.api.get_user_default_printer"
-          );
-          return message;
-      } catch (e) {
-          frappe.msgprint({
-            title    : __("Silent Print"),
-            indicator: "red",
-            message  : __(`Cannot get default printer for this user: <b>${frappe.user.name}</b>`),
-          });
-          throw e;
-      }
-    },
-    async silent_print_invoice(invoice_name){
-      console.log("from: silent_print_invoice- ",invoice_name)
-      const printer = await this.get_user_default_printer();
-      if (!printer) return;
-
-      const { message: { pdf_base64 } } = await frappe.call({
-          method : "pico_silent_print.api.create_pdf",
-          args : {
-            doctype : "Sales Invoice",
-            name : invoice_name,
-            printer,
-            no_letterhead: 1,
-          },
-      });
-
-      this.send_to_printer(printer.printer, pdf_base64);
-
-      // Extra item‑group slips for sales invoices
-      if (printer.print_invoice_items_groups) {
-          const { message: itemPrints } = await frappe.call({
-              method: "pico_silent_print.api.create_item_groups_pdfs",
-              args  : { "invoice_name": invoice_name },
-          });
-          itemPrints.forEach(p =>
-            this.send_to_printer(p.printer_name, p.pdf_base64)
-          );
-        }
-    },
-    send_to_printer(printerId, pdfBase64){
-      this.silent_print_socket.submit({
-            type        : printerId,
-            url         : "file.pdf",
-            file_content: pdfBase64,
-            id          : Date.now(),
-        });
+    silent_print_invoice(invoice_name){
+      console.log("from: silent_print_invoice -> ",invoice_name)
+      frappe.pico.print_invoice(invoice_name)
     },
   },
 
   mounted() {
     // pico silent print
     this.eventBus.on('pico_register_silent_print', (data) => {
-      this.silent_print_socket = data
+      this.silent_print_enabled = data
     });
 
     this.eventBus.on("register_pos_profile", (data) => {

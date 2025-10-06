@@ -54,7 +54,7 @@ export default {
       payment: false,
       offers: false,
       coupons: false,
-      silent_print_socket: ''
+      silent_print_enabled: false,
     };
   },
 
@@ -154,9 +154,13 @@ export default {
     // pico silent print
     async boot_silent_print_service(){
       console.log("from: boot_silent_print_service ")
-      this.silent_print_socket = await frappe.silent_print.WebSocketPrinter.create();
-      // console.log(this.silent_print_socket)
-      this.eventBus.emit('pico_register_silent_print', this.silent_print_socket);
+      await frappe.pico.is_silent_print_enabled().then(isEnabled => {
+        this.silent_print_enabled = isEnabled
+        console.log("silent print is: ", this.silent_print_enabled)
+      })
+      frappe.pico.qz_signing()
+      this.eventBus.emit('pico_register_silent_print', this.silent_print_enabled);
+
     },
   },
 
@@ -171,10 +175,6 @@ export default {
         this.dialog = false;
       });
 
-      // pico silent print
-      // this.eventBus.on('pico_register_silent_print', (data) => {
-
-      // });
 
       this.eventBus.on('register_pos_data', (data) => {
         this.pos_profile = data.pos_profile;
