@@ -213,9 +213,6 @@ export default {
             vm.items = r.message;
             vm.eventBus.emit("set_all_items", vm.items);
 			
-			  if (!vm.pos_profile.pose_use_limit_search) {
-				vm.update_items_details(vm.items);
-			  }
   
             vm.loading = false;
             console.info("Items Loaded");
@@ -631,9 +628,9 @@ export default {
       this.update_cur_items_details();
     });
 	
-	// ✅ Add this to refresh qty after invoice submit
+	// ✅ Refresh items after invoice creation
 	this.eventBus.on("invoice_submitted", () => {
-		this.update_items_details(this.items);
+	  this.get_items(); // 
 	});
 	
     this.eventBus.on("update_offers_counters", (data) => {
