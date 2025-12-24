@@ -184,38 +184,44 @@ def get_items(
 
         result = []
 
-        items_data = frappe.db.sql(
-            """
+        items_data = frappe.db.sql("""
             SELECT
-                name AS item_code,
-                item_name,
-                description,
-                stock_uom,
-                image,
-                is_stock_item,
-                has_variants,
-                variant_of,
-                item_group,
-                idx as idx,
-                has_batch_no,
-                has_serial_no,
-                max_discount,
-                brand
+                i.name AS item_code,
+                i.item_name,
+                i.description,
+                i.stock_uom,
+                i.image,
+                i.is_stock_item,
+                i.has_variants,
+                i.variant_of,
+                i.item_group,
+                i.idx,
+                i.has_batch_no,
+                i.has_serial_no,
+                i.max_discount,
+                i.brand,
+                COALESCE(
+                   (
+                        SELECT sle.qty_after_transaction
+                        FROM `tabStock Ledger Entry` sle
+                        WHERE sle.item_code = i.name
+                          AND sle.warehouse = %(warehouse)s
+                          AND sle.is_cancelled = 0
+                        ORDER BY posting_date DESC, posting_time DESC, creation DESC
+                        LIMIT 1
+                    ), 0
+                ) as actual_qty
             FROM
-                `tabItem`
+                `tabItem` i
             WHERE
-                disabled = 0
-                    AND is_sales_item = 1
-                    AND is_fixed_asset = 0
-                    {condition}
+                i.disabled = 0
+                AND i.is_sales_item = 1
+                AND i.is_fixed_asset = 0
+                {condition}
             ORDER BY
-                item_name asc
+                i.item_name asc
             {limit}
-                """.format(
-                condition=condition, limit=limit
-            ),
-            as_dict=1,
-        )
+        """.format(condition=condition, limit=limit), {"warehouse": warehouse}, as_dict=1)
 
         if items_data:
             items = [d.item_code for d in items_data]
@@ -289,11 +295,7 @@ def get_items(
                         },
                         fields=["name as serial_no"],
                     )
-                item_stock_qty = 0
-                if pos_profile.get("posa_display_items_in_stock") or use_limit_search:
-                    item_stock_qty = get_stock_availability(
-                        item_code, pos_profile.get("warehouse")
-                    )
+
                 attributes = ""
                 if pos_profile.get("posa_show_template_items") and item.has_variants:
                     attributes = get_item_attributes(item.item_code)
@@ -317,7 +319,7 @@ def get_items(
                             "currency": item_price.get("currency")
                             or pos_profile.get("currency"),
                             "item_barcode": item_barcode or [],
-                            "actual_qty": item_stock_qty or 0,
+                            "actual_qty": item.actual_qty or 0,
                             "serial_no_data": serial_no_data or [],
                             "batch_no_data": batch_no_data or [],
                             "attributes": attributes or "",
@@ -969,7 +971,7 @@ def get_items_details(pos_profile, items_data):
                         "item_uoms": uoms or [],
                         "serial_no_data": serial_no_data or [],
                         "batch_no_data": batch_no_data or [],
-                        "actual_qty": item_stock_qty or 0,
+                        "actual_qty": item.get("actual_qty", 0) or 0,
                         "has_batch_no": has_batch_no,
                         "has_serial_no": has_serial_no,
                     }
