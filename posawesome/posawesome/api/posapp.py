@@ -31,6 +31,75 @@ from posawesome.posawesome.doctype.delivery_charges.delivery_charges import (
 )
 from frappe.utils.caching import redis_cache
 
+def _get_pos_profile_flag(pos_profile_name, fieldname, default=0):
+    """Read boolean-ish flag from POS Profile safely."""
+    try:
+        val = frappe.get_cached_value("POS Profile", pos_profile_name, fieldname)
+        if val is None:
+            return default
+        return 1 if int(val) == 1 else 0
+    except Exception:
+        return default
+
+
+def _is_stock_item(item_code):
+    """Return 1 if item is stock item."""
+    try:
+        return 1 if frappe.get_cached_value("Item", item_code, "is_stock_item") else 0
+    except Exception:
+        return 0
+
+
+def _apply_update_stock_policy(invoice_doc, payload=None):
+    """
+    Flexible policy:
+      - If validate_stock_on_save is enabled AND invoice has at least one stock item -> update_stock = 1
+      - If invoice has no stock items -> update_stock = 0
+      - If validate_stock_on_save is disabled -> do NOT force update_stock (leave as is)
+    Additionally:
+      - Ensure warehouse is set for stock items (required for stock posting).
+      - Respect return_against behavior: if original invoice did not update stock, keep update_stock=0 for return.
+    NOTE: This function does NOT touch posa_delivery_date logic (you requested to keep it as-is).
+    """
+    payload = payload or {}
+
+    # Respect returns: if return_against invoice didn't update stock, don't update stock here either
+    if invoice_doc.is_return and invoice_doc.return_against:
+        try:
+            ref_update_stock = frappe.get_cached_value(
+                "Sales Invoice", invoice_doc.return_against, "update_stock"
+            )
+            if not ref_update_stock:
+                invoice_doc.update_stock = 0
+                return
+        except Exception:
+            pass
+
+    pos_profile = invoice_doc.pos_profile
+    default_warehouse = frappe.get_cached_value("POS Profile", pos_profile, "warehouse")
+
+    validate_stock = _get_pos_profile_flag(pos_profile, "validate_stock_on_save", default=0)
+
+    has_stock_items = False
+    for row in (invoice_doc.items or []):
+        if row.item_code and _is_stock_item(row.item_code):
+            has_stock_items = True
+            # Ensure warehouse exists for stock items
+            if not row.warehouse:
+                row.warehouse = default_warehouse
+
+    # No stock items => never update stock
+    if not has_stock_items:
+        invoice_doc.update_stock = 0
+        return
+
+    # validate stock enabled + has stock items => must update stock
+    if validate_stock:
+        invoice_doc.update_stock = 1
+        return
+
+    # validate disabled => do not force update_stock
+    return
 
 @frappe.whitelist()
 def get_opening_dialog_data():
@@ -299,6 +368,7 @@ def get_items(
                 attributes = ""
                 if pos_profile.get("posa_show_template_items") and item.has_variants:
                     attributes = get_item_attributes(item.item_code)
+
                 item_attributes = ""
                 if pos_profile.get("posa_show_template_items") and item.variant_of:
                     item_attributes = frappe.get_all(
@@ -306,27 +376,29 @@ def get_items(
                         fields=["attribute", "attribute_value"],
                         filters={"parent": item.item_code, "parentfield": "attributes"},
                     )
-                if posa_display_items_in_stock and (
-                    not item_stock_qty or item_stock_qty < 0
-                ):
-                    pass
-                else:
-                    row = {}
-                    row.update(item)
-                    row.update(
-                        {
-                            "rate": item_price.get("price_list_rate") or 0,
-                            "currency": item_price.get("currency")
-                            or pos_profile.get("currency"),
-                            "item_barcode": item_barcode or [],
-                            "actual_qty": item.actual_qty or 0,
-                            "serial_no_data": serial_no_data or [],
-                            "batch_no_data": batch_no_data or [],
-                            "attributes": attributes or "",
-                            "item_attributes": item_attributes or "",
-                        }
-                    )
-                    result.append(row)
+
+                # actual_qty is already fetched by SQL as item.actual_qty
+                item_stock_qty = flt(item.actual_qty) if item.actual_qty is not None else 0
+
+                # إذا خيار "عرض العناصر المتوفرة فقط" مفعّل => لا نعرض الصنف إذا الكمية <= 0
+                if posa_display_items_in_stock and item_stock_qty <= 0:
+                    continue
+
+                row = {}
+                row.update(item)
+                row.update(
+                    {
+                        "rate": item_price.get("price_list_rate") or 0,
+                        "currency": item_price.get("currency") or pos_profile.get("currency"),
+                        "item_barcode": item_barcode or [],
+                        "actual_qty": item_stock_qty,
+                        "serial_no_data": serial_no_data or [],
+                        "batch_no_data": batch_no_data or [],
+                        "attributes": attributes or "",
+                        "item_attributes": item_attributes or "",
+                    }
+                )
+                result.append(row)
         return result
 
     if _pos_profile.get("posa_use_server_cache"):
@@ -513,6 +585,8 @@ def update_invoice(data):
     invoice_doc.flags.ignore_permissions = True
     frappe.flags.ignore_account_permission = True
 
+    _apply_update_stock_policy(invoice_doc, data)
+
     if invoice_doc.is_return and invoice_doc.return_against:
         ref_doc = frappe.get_cached_doc(invoice_doc.doctype, invoice_doc.return_against)
         if not ref_doc.update_stock:
@@ -565,10 +639,13 @@ def submit_invoice(invoice, data):
     invoice = json.loads(invoice)
     invoice_doc = frappe.get_doc("Sales Invoice", invoice.get("name"))
     invoice_doc.update(invoice)
-	
+
     if data.get("custom_order_type"):
         invoice_doc.custom_order_type = data.get("custom_order_type")
-	
+
+    # Apply your flexible policy (does not alter posa_delivery_date behavior)
+    _apply_update_stock_policy(invoice_doc, invoice)
+
     if invoice.get("posa_delivery_date"):
         invoice_doc.update_stock = 0
     mop_cash_list = [
